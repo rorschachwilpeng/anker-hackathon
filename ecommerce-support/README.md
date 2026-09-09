@@ -74,7 +74,7 @@ event: error
 data: {"code":"upstream_error","message":"模型服务暂时不可用，请稍后重试。"}
 ```
 
-`error` 后流立即结束，不再发送 `done`；空流或缺少 `done` 也不算成功。开始流式响应前的请求校验失败返回 422，上下文预算超限返回 413。`POST /after-sales/extract` 成功返回且只返回 `order_id`、`request_type`、`expected_solution`，模型输出或解析失败返回脱敏的 502。
+`error` 后流立即结束，不再发送 `done`；空流或缺少 `done` 也不算成功。`done` 的 `finish_reason=length` 表示输出因长度限制被截断，评测器会把它记为失败，只有 `stop` 算完整成功。开始流式响应前的请求校验失败返回 422，上下文预算超限返回 413。`POST /after-sales/extract` 成功返回且只返回 `order_id`、`request_type`、`expected_solution`，模型输出或解析失败返回脱敏的 502。
 
 ## 限制
 

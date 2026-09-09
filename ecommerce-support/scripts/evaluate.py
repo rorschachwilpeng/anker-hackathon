@@ -34,7 +34,10 @@ def parse_sse(source: str | bytes | Iterable[bytes]) -> list[tuple[str, dict[str
 
     text = _decode_chunks(source).replace("\r\n", "\n").replace("\r", "\n")
     events: list[tuple[str, dict[str, Any]]] = []
-    for block in text.split("\n\n"):
+    blocks = text.split("\n\n")
+    if blocks.pop().strip():
+        raise SSEParseError("unterminated event at end of stream")
+    for block in blocks:
         if not block.strip():
             continue
         event_name: str | None = None
@@ -74,6 +77,8 @@ def _chat_text(events: list[tuple[str, dict[str, Any]]]) -> str:
         elif event == "done":
             if not isinstance(payload.get("finish_reason"), str) or not payload["finish_reason"]:
                 raise SSEParseError("done finish_reason must be a non-empty string")
+            if payload["finish_reason"] != "stop":
+                raise SSEParseError(f"finish_reason {payload['finish_reason']} is not a complete success")
             done_count += 1
         else:
             raise SSEParseError(f"unknown event: {event}")
@@ -100,6 +105,18 @@ def _contains_criteria(expect: dict[str, Any], text: str) -> list[dict[str, Any]
     return criteria
 
 
+def _validate_extraction_schema(actual: Any) -> dict[str, Any]:
+    fields = {"order_id", "request_type", "expected_solution"}
+    request_types = {"refund", "return_refund", "exchange", "repair", "logistics", "other", "unknown"}
+    if not isinstance(actual, dict) or set(actual) != fields:
+        raise ValueError("extraction schema requires exactly three documented fields")
+    if not all(actual[field] is None or type(actual[field]) is str for field in ("order_id", "expected_solution")):
+        raise ValueError("extraction schema nullable text fields must be strings or null")
+    if actual["request_type"] not in request_types:
+        raise ValueError("extraction schema request_type is invalid")
+    return actual
+
+
 def evaluate_cases(cases: dict[str, Any], client: httpx.Client) -> dict[str, Any]:
     """Evaluate cases once each; failures are data in the returned report."""
 
@@ -115,9 +132,7 @@ def evaluate_cases(cases: dict[str, Any], client: httpx.Client) -> dict[str, Any
         try:
             response = client.post("/after-sales/extract", json={"description": case["description"]})
             response.raise_for_status()
-            actual = response.json()
-            if not isinstance(actual, dict):
-                raise ValueError("response must be a JSON object")
+            actual = _validate_extraction_schema(response.json())
             result["criteria"] = [
                 {"name": f"{field} equals expected", "passed": actual.get(field) == expected}
                 for field, expected in case["expected"].items()

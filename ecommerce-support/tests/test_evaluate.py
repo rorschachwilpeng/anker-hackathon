@@ -38,6 +38,16 @@ def test_parse_sse_rejects_malformed_events(body):
         parse_sse(body)
 
 
+def test_parse_sse_rejects_unterminated_final_event():
+    body = (
+        'event: token\ndata: {"text":"部分回复"}\n\n'
+        'event: done\ndata: {"finish_reason":"stop"}'
+    )
+
+    with pytest.raises(SSEParseError, match="unterminated"):
+        parse_sse(body)
+
+
 @pytest.mark.parametrize(
     "body, expected_error",
     [
@@ -51,6 +61,10 @@ def test_parse_sse_rejects_malformed_events(body):
         (
             'event: token\ndata: {"text":"看似成功"}\n\nevent: done\ndata: {}\n\n',
             "finish_reason",
+        ),
+        (
+            'event: token\ndata: {"text":"被截断"}\n\nevent: done\ndata: {"finish_reason":"length"}\n\n',
+            "length",
         ),
     ],
 )
@@ -78,6 +92,41 @@ def test_chat_error_or_missing_done_is_a_failed_report(body, expected_error):
     assert report["summary"] == {"total": 1, "passed": 0, "failed": 1}
     assert report["results"][0]["passed"] is False
     assert expected_error in report["results"][0]["error"]
+
+
+@pytest.mark.parametrize(
+    "actual",
+    [
+        {"request_type": "exchange", "expected_solution": "换货"},
+        {
+            "order_id": None,
+            "request_type": "exchange",
+            "expected_solution": "换货",
+            "extra": "unexpected",
+        },
+        {"order_id": 123, "request_type": "exchange", "expected_solution": "换货"},
+        {"order_id": None, "request_type": "invalid", "expected_solution": None},
+    ],
+)
+def test_malformed_extraction_schema_fails_before_label_checks(actual):
+    cases = {
+        "extraction_cases": [
+            {
+                "id": "malformed",
+                "description": "合成测试数据",
+                "expected": {"request_type": actual["request_type"]},
+            }
+        ],
+        "chat_cases": [],
+    }
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=actual))
+
+    with httpx.Client(transport=transport, base_url="http://test") as client:
+        report = evaluate_cases(cases, client)
+
+    assert report["summary"]["failed"] == 1
+    assert report["results"][0]["criteria"] == []
+    assert "schema" in report["results"][0]["error"]
 
 
 def test_evaluator_checks_extraction_and_two_turn_chat_history():
