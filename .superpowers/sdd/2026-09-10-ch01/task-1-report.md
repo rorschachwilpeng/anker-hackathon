@@ -48,3 +48,21 @@ The 28 collected cases cover ASCII and Chinese UTF-8 boundaries, whole-pair trim
 - A later raw LangChain probe showed many parsed empty chunks, then content chunks and `finish_reason=stop`. A full FastAPI probe then returned token events followed by exactly one `done(stop)`. The controller separately observed a successful first chat, a successful second chat with history, and successful structured extraction.
 - The installed `langchain-openai` emits a one-time warning on this machine because macOS system proxy configuration is detected while it builds an unused synchronous client with socket keepalive options. All application paths are asynchronous and use the lifespan-owned `httpx.AsyncClient`; live requests completed. If synchronous model methods are added later, the sync client/proxy behavior should be configured explicitly.
 - Automatic retries remain disabled as required. An intermittent empty parsed stream therefore becomes a sanitized error rather than a fabricated success or silent fallback.
+
+## Review fixes
+
+Files: `app/service.py`, `app/main.py`, `tests/test_service.py`, `tests/test_api.py`.
+Commit: `fix: 关闭模型流并延迟加载配置`.
+
+```text
+$ .venv/bin/python -m pytest -q tests/test_service.py::test_closing_service_stream_closes_model_stream tests/test_api.py::test_module_import_and_service_injection_do_not_require_environment
+FF
+2 failed in 0.95s
+```
+
+```text
+$ .venv/bin/python -m pytest -q
+30 passed in 1.40s
+$ .venv/bin/python -m compileall -q app tests
+# exit 0
+```

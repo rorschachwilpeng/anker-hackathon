@@ -1,8 +1,10 @@
+import asyncio
 import json
 
 import httpx
 import pytest
 from langchain_core.exceptions import OutputParserException
+from langchain_core.messages import AIMessageChunk
 from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
@@ -72,6 +74,36 @@ async def test_chat_uses_real_langchain_serialization_and_finish_metadata() -> N
     assert captured["stream_options"] is None if "stream_options" in captured else True
     assert captured["max_completion_tokens"] == 64
     assert [message["role"] for message in captured["messages"]] == ["system", "user"]
+
+
+class ClosingModel:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def with_structured_output(self, schema, *, method):
+        return self
+
+    def astream(self, messages):
+        async def chunks():
+            try:
+                yield AIMessageChunk(content="first")
+                await asyncio.Event().wait()
+            finally:
+                self.closed = True
+
+        return chunks()
+
+
+@pytest.mark.asyncio
+async def test_closing_service_stream_closes_model_stream() -> None:
+    model = ClosingModel()
+    service = CustomerSupportService(settings(), model=model)
+    stream = service.stream("问题", [])
+
+    assert await anext(stream) == TokenChunk("first")
+    await stream.aclose()
+
+    assert model.closed is True
 
 
 @pytest.mark.asyncio

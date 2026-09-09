@@ -26,8 +26,6 @@ def create_app(
     settings: Settings | None = None,
     service: CustomerSupportService | None = None,
 ) -> FastAPI:
-    resolved_settings = settings or Settings()
-
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         if service is not None:
@@ -35,6 +33,7 @@ def create_app(
             yield
             return
 
+        resolved_settings = settings or Settings()
         async with httpx.AsyncClient() as client:
             application.state.service = CustomerSupportService(
                 resolved_settings,

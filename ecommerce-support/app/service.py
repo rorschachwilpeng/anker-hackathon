@@ -78,19 +78,24 @@ class CustomerSupportService:
         messages = self._chat_messages(message, history)
         finish_reason: str | None = None
         emitted_text = False
+        upstream = self.model.astream(messages)
+        try:
+            async for chunk in upstream:
+                text = chunk.text
+                if text:
+                    emitted_text = True
+                    yield TokenChunk(text)
+                candidate = chunk.response_metadata.get("finish_reason")
+                if candidate:
+                    finish_reason = str(candidate)
 
-        async for chunk in self.model.astream(messages):
-            text = chunk.text
-            if text:
-                emitted_text = True
-                yield TokenChunk(text)
-            candidate = chunk.response_metadata.get("finish_reason")
-            if candidate:
-                finish_reason = str(candidate)
-
-        if not emitted_text or finish_reason is None:
-            raise RuntimeError("upstream stream ended without content or finish metadata")
-        yield FinishChunk(finish_reason)
+            if not emitted_text or finish_reason is None:
+                raise RuntimeError("upstream stream ended without content or finish metadata")
+            yield FinishChunk(finish_reason)
+        finally:
+            close = getattr(upstream, "aclose", None)
+            if close is not None:
+                await close()
 
     async def extract(self, description: str) -> AfterSales:
         messages = self._extraction_messages(description)

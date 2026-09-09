@@ -1,6 +1,10 @@
 import asyncio
 import json
-from collections.abc import AsyncIterator
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -56,6 +60,29 @@ class FakeService:
 
 def make_client(service: FakeService) -> TestClient:
     return TestClient(create_app(settings=settings(), service=service))
+
+
+def test_module_import_and_service_injection_do_not_require_environment(tmp_path: Path) -> None:
+    source_app = Path(__file__).resolve().parents[1] / "app"
+    shutil.copytree(source_app, tmp_path / "app")
+    environment = os.environ.copy()
+    for name in ("OPENAI_BASE_URL", "OPENAI_MODEL", "OPENAI_API_KEY"):
+        environment.pop(name, None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from app.main import create_app; create_app(service=object())",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_health() -> None:
