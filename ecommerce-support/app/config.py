@@ -1,0 +1,57 @@
+import math
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=PROJECT_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    openai_base_url: str = Field(min_length=1)
+    openai_model: str = Field(min_length=1)
+    openai_api_key: SecretStr
+    context_window_tokens: int = Field(default=8192, gt=0)
+    max_output_tokens: int = Field(default=512, gt=0)
+    context_margin_tokens: int = Field(default=256, ge=0)
+    request_timeout: float = Field(default=60.0, gt=0)
+    structured_output_method: Literal["json_mode", "json_schema"] = "json_mode"
+
+    @field_validator("openai_base_url", "openai_model")
+    @classmethod
+    def reject_blank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("openai_api_key")
+    @classmethod
+    def reject_blank_secret(cls, value: SecretStr) -> SecretStr:
+        if not value.get_secret_value().strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("request_timeout")
+    @classmethod
+    def require_finite_timeout(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("must be finite")
+        return value
+
+    @model_validator(mode="after")
+    def require_positive_input_budget(self) -> "Settings":
+        if self.context_window_tokens <= self.max_output_tokens + self.context_margin_tokens:
+            raise ValueError("context window must exceed output tokens plus margin")
+        return self
+
+    @property
+    def input_budget(self) -> int:
+        return self.context_window_tokens - self.max_output_tokens - self.context_margin_tokens
