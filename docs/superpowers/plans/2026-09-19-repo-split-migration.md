@@ -32,10 +32,10 @@
 
 **Remote:** `rorschachwilpeng/anker-hackathon`
 
-- [ ] Rename the existing GitHub repository from `anker-ghost-in-the-shell-hackathon` to `anker-hackathon`.
-- [ ] Set repository visibility to private.
-- [ ] Update and verify the local `origin` URL.
-- [ ] Push the current main branch without merging active worktree changes.
+- [x] Rename the existing GitHub repository from `anker-ghost-in-the-shell-hackathon` to `anker-hackathon`.
+- [x] Set repository visibility to private.
+- [x] Update and verify the local `origin` URL.
+- [x] Push the current main branch without merging active worktree changes.
 
 ### Task 3: Create the Evo repository
 
@@ -43,21 +43,21 @@
 
 **Remote:** `rorschachwilpeng/evotavern-agent-hackathon`
 
-- [ ] Create the private GitHub repository and local checkout.
-- [ ] Initialize the project lifecycle directory structure.
-- [ ] Create Evo-only `AGENTS.md`, project Spec and repository README.
-- [ ] Copy the committed Ghost research snapshot from commit `67c9733`.
-- [ ] Add a migration manifest listing source commit and file mapping.
-- [ ] Commit and push the initial Evo repository.
+- [x] Create the private GitHub repository and local checkout.
+- [x] Initialize the project lifecycle directory structure.
+- [x] Create Evo-only `AGENTS.md`, project Spec and repository README.
+- [x] Copy the committed Ghost research snapshot from commit `67c9733`.
+- [x] Add a migration manifest listing source commit and file mapping.
+- [x] Commit and push the initial Evo repository.
 
 ### Task 4: Review gate
 
 **Verification:**
 
-- [ ] Compare the source Ghost research file list with the Evo repository manifest.
-- [ ] Confirm every migrated Markdown file is byte-identical or explicitly marked as adapted.
-- [ ] Confirm the Anker repository still contains all pre-migration Evo content.
-- [ ] Give the user links to both private repositories and the local review files.
+- [x] Compare the source Ghost research file list with the Evo repository manifest.
+- [x] Confirm every migrated Markdown file is byte-identical or explicitly marked as adapted.
+- [x] Confirm the Anker repository still contains all pre-migration Evo content.
+- [x] Give the user links to both private repositories and the local review files.
 - [ ] Stop and wait for explicit approval.
 
 ### Task 5: Clean Anker after approval
