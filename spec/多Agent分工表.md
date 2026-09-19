@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | Product Lead | `01a0adb4-b39f-7070-a581-771cda40c4a7` | `~/.codex/worktrees/5648/anker-ghost-in-the-shell-hackathon` | 有效 |
 | Technical Builder | `01a0b4e1-f4df-7133-8075-03f34c242983` | `~/.codex/worktrees/9a8c/anker-ghost-in-the-shell-hackathon` | 有效 |
-| 误建的 Builder fork | `01a0b7dc-a0ab-79c1-b3e0-bfffc5d534e1` | 与 Product Lead 共用 `5648` 工作树 | 已停用；不得继续派单 |
+| 误建的 Builder fork | `01a0b7dc-a0ab-79c1-b3e0-bfffc5d534e1` | 与 Product Lead 共用 `5648` 工作树 | 已归档；不得继续派单 |
 
 新增、替换或恢复长期线程前，总控必须先核对本表与现有线程列表；只有确认原线程已归档、损坏或无法恢复，才能创建替代线程，并在派发第一项任务前更新本表。Product Lead 和 Technical Builder 不得自行 fork 或新建对方角色作为临时替代。
 
