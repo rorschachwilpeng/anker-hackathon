@@ -16,6 +16,24 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    embedding_base_url: str = 'https://api.siliconflow.cn/v1'
+    embedding_model: Literal['BAAI/bge-m3'] = 'BAAI/bge-m3'
+    embedding_api_key: SecretStr | None = None
+    milvus_uri: str = 'http://127.0.0.1:19530'
+    knowledge_top_k: int = Field(default=5, ge=1, le=20)
+    knowledge_score_threshold: float | None = Field(default=None, ge=-1, le=1)
+    knowledge_tool_timeout: float = Field(default=20, gt=0, le=60)
+    knowledge_worker_enabled: bool = False
+    knowledge_worker_timezone: str = 'Asia/Shanghai'
+
+    def ensure_knowledge_ready(self, *, search: bool = True) -> None:
+        if not self.embedding_api_key or not self.embedding_api_key.get_secret_value().strip():
+            raise ValueError('embedding_api_key is required')
+        if self.embedding_base_url.rstrip('/') != 'https://api.siliconflow.cn/v1':
+            raise ValueError('embedding endpoint must be SiliconFlow')
+        if search and self.knowledge_score_threshold is None:
+            raise ValueError('knowledge score threshold requires calibration')
+
     database_url: SecretStr | None = None
     tool_timeout: float = Field(default=5.0, gt=0, le=30)
 
