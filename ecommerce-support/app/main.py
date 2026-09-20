@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,6 +19,11 @@ from app.config import Settings
 from app.context import ContextBudgetExceeded
 from app.schemas import AfterSales, ChatRequest, ExtractionRequest
 from app.service import CustomerSupportService, FinishChunk, TokenChunk
+from app.knowledge.embeddings import SiliconFlowEmbeddings
+from app.knowledge.repository import KnowledgeRepository
+from app.knowledge.retrieval import KnowledgeSearch
+from app.knowledge.state import StateStore
+from app.knowledge.vectors import MilvusVectors
 
 
 UPSTREAM_ERROR = {"code": "upstream_error", "message": "模型服务暂时不可用，请稍后重试。"}
@@ -50,11 +56,35 @@ def create_app(
             if resolved_settings.database_url is None:
                 raise RuntimeError('DATABASE_URL is required; initialize MySQL first')
             database = Database(resolved_settings.database_url.get_secret_value())
+            milvus = None
+            knowledge_search = None
+            try:
+                resolved_settings.ensure_knowledge_ready(search=True)
+                from pymilvus import AsyncMilvusClient
+                milvus = AsyncMilvusClient(resolved_settings.milvus_uri)
+                fingerprint = hashlib.sha256(
+                    f'{resolved_settings.embedding_base_url.rstrip("/")}|{resolved_settings.embedding_model}|1024|text-v1'.encode()
+                ).hexdigest()
+                state = StateStore(database, namespace='knowledge')
+                knowledge_repo = KnowledgeRepository(database.sessions, state=state, fingerprint=fingerprint)
+                knowledge_search = KnowledgeSearch(
+                    knowledge_repo,
+                    SiliconFlowEmbeddings(client, resolved_settings),
+                    MilvusVectors(milvus, 'knowledge'),
+                    resolved_settings.knowledge_score_threshold,
+                    resolved_settings.knowledge_top_k,
+                )
+            except Exception:
+                if milvus is not None:
+                    await milvus.close()
+                    milvus = None
             application.state.chat_service = chat_service or ChatService(
-                resolved_settings, application.state.service.model, Repository(database.sessions))
+                resolved_settings, application.state.service.model, Repository(database.sessions), knowledge_search)
             try:
                 yield
             finally:
+                if milvus is not None:
+                    await milvus.close()
                 await database.close()
 
     application = FastAPI(lifespan=lifespan)

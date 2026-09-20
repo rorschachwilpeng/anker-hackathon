@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from typing import Literal
 from langchain_core.tools import tool
 from pydantic import BaseModel, ConfigDict, Field
+from app.knowledge.retrieval import pack_faq_result
+from app.knowledge.types import KnowledgeError
+from app.tools.errors import RetryableToolError, ToolError
 
 @dataclass(frozen=True)
 class ToolContext:
@@ -16,12 +19,12 @@ class OrderArgs(StrictArgs):
 class ProductArgs(StrictArgs):
     product_id: str=Field(min_length=1,max_length=64)
 class FaqArgs(StrictArgs):
-    keyword: str=Field(min_length=1,max_length=64,description='用户原话中的主题关键词，去掉问句成分；禁止同义词替换，如邮费必须保留邮费，不得改成运费')
+    keyword: str=Field(min_length=1,max_length=64,description='保留用户原始表达的完整查询主题，用于语义知识检索')
 class TicketArgs(StrictArgs):
     description: str=Field(min_length=1,max_length=2000)
     ticket_type: Literal['售后','投诉','咨询']
 
-def build_tools(repo,context: ToolContext):
+def build_tools(repo,context: ToolContext,knowledge_search=None):
     mock_cache={}
     def mock(kind,ident):
         key=(kind,ident)
@@ -46,9 +49,17 @@ def build_tools(repo,context: ToolContext):
         return mock('logistics',order_id)
     @tool(args_schema=FaqArgs)
     async def query_faq(keyword: str):
-        """按用户原词查询商家政策和常见问题。只支持字面匹配，禁止同义改写。"""
-        rows=await repo.find_faq(keyword)
-        return {'keyword':keyword,'found':bool(rows),'items':rows}
+        """用语义知识检索查询商家政策、配送费用和常见问题，可理解不同问法。"""
+        if knowledge_search is None:
+            raise ToolError('knowledge_not_configured','知识库尚未配置，暂时无法查询商家政策')
+        try:
+            rows=await knowledge_search.find(keyword)
+            return pack_faq_result(keyword,rows)
+        except KnowledgeError as exc:
+            if exc.retryable:
+                raise RetryableToolError('知识检索服务暂时不可用') from exc
+            code=exc.code if exc.code=='knowledge_budget_exceeded' else 'knowledge_unavailable'
+            raise ToolError(code,'知识检索失败，暂时无法确认商家政策') from exc
     @tool(args_schema=TicketArgs)
     async def create_ticket(description: str,ticket_type: str):
         """用户明确要求人工协助、提交工单或投诉时创建人工工单。"""

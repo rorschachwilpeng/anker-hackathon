@@ -13,7 +13,7 @@ async def test_unknown_and_invalid_are_safe():
         events=[x async for x in executor.execute(call)]
         assert events[-1].data['result']['error']['code']==code
 
-async def test_timeout_retries_only_once():
+async def test_timeout_is_one_total_budget_and_does_not_restart_full_timeout():
     from app.tools.executor import ToolExecutor
     calls=[]
     @tool
@@ -22,9 +22,36 @@ async def test_timeout_retries_only_once():
         calls.append(1)
         await asyncio.sleep(1)
     events=[e async for e in ToolExecutor([slow],timeout_seconds=.005).execute({'id':'c','name':'slow','args':{}})]
-    assert len(calls)==2
+    assert len(calls)==1
     assert events[-1].data['result']['error']['code']=='timeout'
-    assert [e.data['status'] for e in events]==['running','retrying','running','failed']
+    assert [e.data['status'] for e in events]==['running','failed']
+
+async def test_fast_retryable_failure_can_succeed_within_total_budget():
+    from app.tools.errors import RetryableToolError
+    from app.tools.executor import ToolExecutor
+    calls=[]
+    @tool
+    async def flaky():
+        """Transient operation."""
+        calls.append(1)
+        if len(calls)==1:raise RetryableToolError('temporary')
+        return {'done':True}
+    events=[e async for e in ToolExecutor([flaky],timeout_seconds=.2).execute({'id':'c','name':'flaky','args':{}})]
+    assert len(calls)==2
+    assert [e.data['status'] for e in events]==['running','retrying','running','succeeded']
+
+async def test_retry_is_skipped_when_total_budget_is_too_small():
+    from app.tools.errors import RetryableToolError
+    from app.tools.executor import ToolExecutor
+    calls=[]
+    @tool
+    async def unavailable():
+        """Unavailable operation."""
+        calls.append(1)
+        raise RetryableToolError('temporary')
+    events=[e async for e in ToolExecutor([unavailable],timeout_seconds=.005).execute({'id':'c','name':'unavailable','args':{}})]
+    assert len(calls)==1
+    assert [e.data['status'] for e in events]==['running','failed']
 
 async def test_ticket_context_not_model_controlled():
     from app.tools.business import build_tools,ToolContext

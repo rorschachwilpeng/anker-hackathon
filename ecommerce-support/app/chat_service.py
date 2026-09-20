@@ -32,13 +32,13 @@ class PreparedTurn:
             self.closed = True
 
 class ChatService:
-    def __init__(self,settings,model,repo):
-        self.settings=settings;self.model=model;self.repo=repo;self.busy=set()
+    def __init__(self,settings,model,repo,knowledge_search=None):
+        self.settings=settings;self.model=model;self.repo=repo;self.knowledge_search=knowledge_search;self.busy=set()
         self.system=TOOL_CHAT_PROMPT.format()
 
     async def prepare(self,message,conversation_id=None):
         # Validate fixed input before creating/writing a conversation.
-        tools=build_tools(self.repo,ToolContext(conversation_id or 0,'T'+uuid.uuid4().hex[:30]))
+        tools=build_tools(self.repo,ToolContext(conversation_id or 0,'T'+uuid.uuid4().hex[:30]),self.knowledge_search)
         schema_bytes=max(3072,len(json.dumps([convert_to_openai_tool(t) for t in tools],ensure_ascii=False).encode()))
         trim_turns(self.system,[],[HumanMessage(message)],self.settings.input_budget,schema_bytes)
         if conversation_id is None:conversation_id=await self.repo.new_conversation('local-demo')
@@ -49,7 +49,7 @@ class ChatService:
         self.busy.add(conversation_id)
         try:
             turns=complete_turns(await self.repo.load_messages(conversation_id))
-            tools=build_tools(self.repo,ToolContext(conversation_id,'T'+uuid.uuid4().hex[:30]))
+            tools=build_tools(self.repo,ToolContext(conversation_id,'T'+uuid.uuid4().hex[:30]),self.knowledge_search)
             messages=trim_turns(self.system,turns,[HumanMessage(message)],self.settings.input_budget,schema_bytes)
             return PreparedTurn(conversation_id,message,turns,tools,messages,self)
         except BaseException:
@@ -87,12 +87,13 @@ class ChatService:
                 reserved=[ToolMessage(content='x'*(2048 if i==0 else 256),tool_call_id=c['id']) for i,c in enumerate(calls)]
                 trim_turns(self.system,[],[*current,*reserved],self.settings.input_budget)
                 await self.repo.append_message(cid,'assistant',tool_calls=stored)
-                executor=ToolExecutor(turn.tools,timeout_seconds=self.settings.tool_timeout)
                 for index,call in enumerate(calls):
                     if index:
                         result=failure('single_tool_limit','本轮只执行第一个工具，此工具未执行')
                         yield StreamEvent('tool_status',{'name':call['name'],'tool_call_id':call['id'],'status':'skipped','attempt':0})
                     else:
+                        timeout=self.settings.knowledge_tool_timeout if call['name']=='query_faq' else self.settings.tool_timeout
+                        executor=ToolExecutor(turn.tools,timeout_seconds=timeout)
                         result=None
                         async for event in executor.execute(call):
                             if 'result' in event.data:result=event.data['result']

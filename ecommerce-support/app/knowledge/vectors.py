@@ -40,8 +40,11 @@ class MilvusVectors:
 
     async def search(self, vector, top_k):
         if not valid_vector(vector):raise VectorError('vector_invalid_embedding')
-        results=await self.client.search(self.collection,data=[vector],anns_field='vector',limit=top_k,
-            output_fields=['content_hash'],search_params={'metric_type':'COSINE'},consistency_level='Strong',timeout=10)
+        try:
+            results=await self.client.search(self.collection,data=[vector],anns_field='vector',limit=top_k,
+                output_fields=['content_hash'],search_params={'metric_type':'COSINE'},consistency_level='Strong',timeout=10)
+        except Exception:
+            raise VectorError('vector_search_unavailable',retryable=True) from None
         return [Hit(int(r['id']),float(r['distance']),r['entity']['content_hash']) for r in results[0]]
 
     async def delete(self, ids):
