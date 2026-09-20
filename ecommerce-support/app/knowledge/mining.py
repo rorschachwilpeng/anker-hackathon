@@ -55,9 +55,11 @@ def build_batches(sources, byte_budget=60_000):
 
 
 class MiningService:
-    def __init__(self, repository, extractor, *, byte_budget=60_000):
+    def __init__(self, repository, extractor, *, dedup_service=None, ingestion=None, byte_budget=60_000):
         self.repository = repository
         self.extractor = extractor
+        self.dedup_service = dedup_service
+        self.ingestion = ingestion
         self.byte_budget = byte_budget
 
     async def extract_all(self, run_id):
@@ -87,3 +89,10 @@ class MiningService:
         await self.repository.commit_mining_run(run_id, accepted, rejected, changed)
         return {"scanned": len(sources), "staged": len(accepted), "rejected": len(rejected)}
 
+    async def run(self, run_id):
+        if self.dedup_service is None or self.ingestion is None:
+            raise RuntimeError("mining pipeline is incomplete")
+        extraction = await self.extract_all(run_id)
+        dedup = await self.dedup_service.run()
+        vectorization = await self.ingestion.resume()
+        return {"run_id": run_id, "extraction": extraction, "dedup": dedup, "vectorization": vectorization}

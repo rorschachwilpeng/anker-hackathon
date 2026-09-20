@@ -150,3 +150,32 @@ async def test_staging_and_source_state_roll_back_together(knowledge_repo, monke
             )
         )).scalar_one()
     assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_run_orders_extract_dedup_then_vectorize(monkeypatch):
+    from app.knowledge.mining import MiningService
+
+    events = []
+
+    class Dedup:
+        async def run(self):
+            events.append("dedup")
+            return {"candidates": 0}
+
+    class Ingestion:
+        async def resume(self):
+            events.append("resume")
+            return {"pending": 0}
+
+    service = MiningService(FakeRepository([]), FakeExtractor(), dedup_service=Dedup(), ingestion=Ingestion())
+    original = service.extract_all
+
+    async def extract(run_id):
+        events.append("extract")
+        return await original(run_id)
+
+    monkeypatch.setattr(service, "extract_all", extract)
+    report = await service.run("ordered-run")
+    assert events == ["extract", "dedup", "resume"]
+    assert report["run_id"] == "ordered-run"

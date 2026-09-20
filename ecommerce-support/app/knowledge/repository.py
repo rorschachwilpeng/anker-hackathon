@@ -170,3 +170,75 @@ class KnowledgeRepository:
                 'run_id':run_id,'status':'committed','accepted':len(accepted),'rejected':len(rejected),
                 'source_ids':[source['id'] for source in sources],
             },s)
+
+    async def staging_candidates(self):
+        decided={int(key.rsplit(':',1)[1]) for key,_ in await self.state.entries('dedup:staging:')}
+        async with self.sessions() as s:
+            rows=(await s.execute(select(staging).where(staging.c.status=='extracted').order_by(staging.c.id))).mappings().all()
+            result=[]
+            for row in rows:
+                if row['id'] in decided:continue
+                metadata=await self.state.get('mining:qa:'+str(row['id']),s) or {}
+                result.append({
+                    'staging_id':row['id'],'conversation_id':metadata.get('conversation_id'),
+                    'category':metadata.get('category',''),'question':row['question'],'answer':row['answer'],
+                    'evidence_message_ids':metadata.get('evidence_message_ids',[]),
+                })
+            return result
+
+    async def knowledge_catalog(self):
+        async with self.sessions() as s:
+            rows=(await s.execute(select(
+                chunks.c.id,chunks.c.category,chunks.c.questions,chunks.c.answer,chunks.c.content_type
+            ).order_by(chunks.c.id))).mappings().all()
+            return [dict(row) for row in rows]
+
+    async def apply_dedup(self,candidate,decision):
+        """Apply one reviewed decision atomically; authoritative answers are never rewritten."""
+        staging_id=candidate['staging_id']
+        async with self.sessions.begin() as s:
+            row=(await s.execute(select(staging).where(staging.c.id==staging_id).with_for_update())).mappings().first()
+            if not row or row['status']!='extracted':return None
+            action=decision.action
+            target=None
+            if action in ('merge','discard') and decision.target_id is not None:
+                target=(await s.execute(select(chunks).where(chunks.c.id==decision.target_id).with_for_update())).mappings().first()
+                if target is None:
+                    action='review'
+            if action=='review':
+                await self.state.put('dedup:staging:'+str(staging_id),{
+                    'action':'review','target_id':decision.target_id,'reason':decision.reason,
+                },s)
+                return None
+            if action=='discard':
+                await s.execute(update(staging).where(staging.c.id==staging_id).values(status='discarded'))
+                await self.state.put('dedup:staging:'+str(staging_id),{
+                    'action':'discard','target_id':decision.target_id,'reason':decision.reason,
+                },s)
+                return dict(target) if target else None
+            if action=='new':
+                draft=ChunkDraft(candidate['category'],candidate['question'],candidate['answer'],content_type='conversation')
+                ident=(await s.execute(insert(chunks).values(**asdict(draft)))).inserted_primary_key[0]
+                if not 0<ident<2**63:raise KnowledgeError('knowledge_id_out_of_range')
+                digest=content_hash(draft)
+                await self.state.put(source_state_key('mined:'+str(staging_id)),{
+                    'source':'mined:'+str(staging_id),'ids':[ident],'hashes':[digest],'deleted_ids':[],
+                },s)
+                result={'id':ident,'category':draft.category,'questions':draft.questions,'answer':draft.answer,'content_type':'conversation'}
+            else:
+                questions=[value for value in target['questions'].splitlines() if value.strip()]
+                known={' '.join(value.split()).casefold() for value in questions}
+                if ' '.join(candidate['question'].split()).casefold() not in known:questions.append(candidate['question'])
+                await s.execute(update(chunks).where(chunks.c.id==target['id']).values(
+                    questions='\n'.join(questions),vectorize_status='pending',vector_id=None,
+                ))
+                await self.state.put('mining:merge:'+str(staging_id),{
+                    'target_id':target['id'],'question':candidate['question'],
+                    'target_content_hash_before':snapshot(target).content_hash,
+                },s)
+                result={**dict(target),'questions':'\n'.join(questions)}
+            await s.execute(update(staging).where(staging.c.id==staging_id).values(status='kept'))
+            await self.state.put('dedup:staging:'+str(staging_id),{
+                'action':action,'target_id':result['id'],'reason':decision.reason,
+            },s)
+            return result
