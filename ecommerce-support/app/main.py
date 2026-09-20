@@ -1,12 +1,14 @@
 import asyncio
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import anyio
 import httpx
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import Settings
 from app.context import ContextBudgetExceeded
@@ -42,6 +44,13 @@ def create_app(
             yield
 
     application = FastAPI(lifespan=lifespan)
+    static_dir = Path(__file__).resolve().parent / "static"
+    application.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    @application.get("/", include_in_schema=False)
+    @application.get("/chat", include_in_schema=False)
+    async def chat_page() -> FileResponse:
+        return FileResponse(static_dir / "index.html", headers={"Cache-Control": "no-cache"})
 
     @application.get("/health")
     async def health() -> dict[str, str]:
