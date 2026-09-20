@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 def test_knowledge_settings_require_calibration_only_for_search():
     from app.config import Settings
-    s = Settings(_env_file=None, openai_base_url='https://example.com/v1', openai_model='demo', openai_api_key='secret')
+    s = Settings(_env_file=None, openai_base_url='https://example.com/v1', openai_model='demo', openai_api_key='secret', embedding_api_key=None, knowledge_score_threshold=None)
     assert s.knowledge_score_threshold is None
     with pytest.raises(ValueError, match='embedding'):
         s.ensure_knowledge_ready()
