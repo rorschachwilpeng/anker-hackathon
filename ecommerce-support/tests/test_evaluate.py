@@ -141,16 +141,14 @@ def test_evaluator_checks_extraction_and_two_turn_chat_history():
                     "expected_solution": "换大一码",
                 },
             )
-        if not payload["history"]:
+        if payload.get("conversation_id") is None:
             answer = "收到订单 DEMO20260910005，请问需要什么帮助？"
-        elif payload["history"] == [
-            {"role": "user", "content": "我的订单号是 DEMO20260910005。"},
-            {"role": "assistant", "content": "收到订单 DEMO20260910005，请问需要什么帮助？"},
-        ]:
+        elif payload["conversation_id"] == 42:
             answer = "您刚才提供的是 DEMO20260910005。"
         else:
             answer = "没有收到历史。"
         body = (
+            'event: session\ndata: {"conversation_id":42}\n\n'
             f'event: token\ndata: {json.dumps({"text": answer}, ensure_ascii=False)}\n\n'
             'event: done\ndata: {"finish_reason":"stop"}\n\n'
         )
@@ -288,3 +286,14 @@ def test_http_failure_is_not_retried():
 
     assert report["summary"]["failed"] == 1
     assert attempts == 1
+
+
+def test_chat_evaluation_uses_server_conversation_id():
+    payloads=[]
+    def handler(request):
+        payloads.append(json.loads(request.content))
+        return httpx.Response(200,text='event: session\ndata: {"conversation_id":42}\n\nevent: token\ndata: {"text":"hello"}\n\nevent: done\ndata: {"finish_reason":"stop"}\n\n')
+    with httpx.Client(transport=httpx.MockTransport(handler),base_url='http://test') as client:
+        report=evaluate_cases({'chat_cases':[{'id':'two','turns':[{'message':'a'},{'message':'b'}]}]},client)
+    assert report['summary']['failed']==0
+    assert payloads[1]=={'message':'b','conversation_id':42}

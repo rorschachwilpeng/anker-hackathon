@@ -16,6 +16,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    database_url: SecretStr | None = None
+    tool_timeout: float = Field(default=5.0, gt=0, le=30)
+
     openai_base_url: str = Field(min_length=1)
     openai_model: str = Field(min_length=1)
     openai_api_key: SecretStr

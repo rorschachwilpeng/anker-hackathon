@@ -10,6 +10,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.database import Database
+from app.repositories import Repository
+from app.chat_service import ChatService
+from app.routes.chat import stateful_chat
 from app.config import Settings
 from app.context import ContextBudgetExceeded
 from app.schemas import AfterSales, ChatRequest, ExtractionRequest
@@ -27,9 +31,11 @@ def _sse(event: str, payload: dict[str, Any]) -> str:
 def create_app(
     settings: Settings | None = None,
     service: CustomerSupportService | None = None,
+    chat_service: ChatService | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
+        application.state.chat_service = chat_service
         if service is not None:
             application.state.service = service
             yield
@@ -41,7 +47,15 @@ def create_app(
                 resolved_settings,
                 http_async_client=client,
             )
-            yield
+            if resolved_settings.database_url is None:
+                raise RuntimeError('DATABASE_URL is required; initialize MySQL first')
+            database = Database(resolved_settings.database_url.get_secret_value())
+            application.state.chat_service = chat_service or ChatService(
+                resolved_settings, application.state.service.model, Repository(database.sessions))
+            try:
+                yield
+            finally:
+                await database.close()
 
     application = FastAPI(lifespan=lifespan)
     static_dir = Path(__file__).resolve().parent / "static"
@@ -58,6 +72,8 @@ def create_app(
 
     @application.post("/chat")
     async def chat(request: ChatRequest) -> StreamingResponse:
+        if application.state.chat_service is not None:
+            return await stateful_chat(application.state.chat_service, request)
         chat_service = application.state.service
         try:
             chat_service.ensure_chat_fits(request.message, request.history)

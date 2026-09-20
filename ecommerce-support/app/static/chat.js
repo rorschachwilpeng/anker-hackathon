@@ -1,7 +1,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 let mode = 'chat';
-let history = [];
+let conversationId = null;
 let active = null;
 const titles = {chat: '客服对话', extract: '售后提取'};
 const types = {refund:'退款',return_refund:'退货退款',exchange:'换货',repair:'维修',logistics:'物流问题',other:'其他',unknown:'未说明'};
@@ -17,15 +17,16 @@ function addMessage(role, text) {
   const article = document.createElement('article'); article.className = `message ${role}`;
   const label = document.createElement('div'); label.className = 'speaker'; label.textContent = role === 'user' ? '你' : '知遇 · AI 助手';
   const bubble = document.createElement('div'); bubble.className = 'bubble'; bubble.textContent = text;
-  article.append(label,bubble); $('messages').append(article); scrollDown();
-  return {article,bubble};
+  const tools=document.createElement('div'); tools.className='tool-traces';
+  article.append(label,tools,bubble); $('messages').append(article); scrollDown();
+  return {article,bubble,tools,badges:new Map()};
 }
 function note(view,text,error=false) {
   const el=document.createElement('div'); el.className='message-note'+(error?' error':''); el.textContent=text; view.article.append(el); scrollDown();
 }
 function reset(next=mode) {
   if(active) return;
-  mode=next; history=[]; $('messages').replaceChildren(); $('welcome').hidden=false; $('message').value='';
+  mode=next; conversationId=null; $('messages').replaceChildren(); $('welcome').hidden=false; $('message').value='';
   $('announcement').textContent='已开始新对话';
   $('page-title').textContent=titles[mode];
   for(const kind of ['chat','extract']) {const button=$(kind+'-mode'); button.classList.toggle('selected',kind===mode); if(kind===mode) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');}
@@ -49,6 +50,9 @@ async function streamChat(response,view) {
         const raw=lines.filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
         if(!raw) continue;
         const data=JSON.parse(raw);
+        if(event==='answer_reset') {answer='';view.bubble.textContent='正在查询…';}
+        if(event==='session') { if(!Number.isSafeInteger(data.conversation_id)||data.conversation_id<1) throw new Error('会话标识无效'); conversationId=data.conversation_id; }
+        if(event==='tool_status') updateToolBadge(view,data);
         if(event==='error') throw new Error(data.message || '回复中断，请重试。');
         if(event==='token') {
           if(typeof data.text!=='string') throw new Error('回复格式异常，请重试。');
@@ -77,21 +81,21 @@ async function submit(event) {
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
   $('announcement').textContent=mode==='chat'?'正在生成回复':'正在提取售后信息';
   addMessage('user',message); const view=addMessage('assistant',mode==='chat'?'正在思考…':'正在整理…');
-  let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},90000);
+  let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},150000);
   try {
-    const response=await fetch(mode==='chat'?'/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='chat'?{message,history:history.slice(-40)}:{description:message}),signal:controller.signal});
+    const response=await fetch(mode==='chat'?'/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='chat'?{message,conversation_id:conversationId}:{description:message}),signal:controller.signal});
     if(!response.ok) {const data=await response.json().catch(()=>({}));throw new Error(typeof data.detail==='string'?data.detail:`请求未成功（${response.status}），请检查输入后重试。`);}
     if(mode==='chat') {
       const {answer,reason}=await streamChat(response,view);
       if(reason==='length') note(view,'回复达到长度上限，内容可能不完整；本轮未加入对话记忆。');
-      else if(answer.length>16000) note(view,'本轮回复过长，未加入对话记忆。');
-      else history=[...history,{role:'user',content:message},{role:'assistant',content:answer}].slice(-40);
+
     } else showExtraction(await response.json(),view);
     $('announcement').textContent='回复完成';
   } catch(error) {
     if(view.bubble.textContent==='正在思考…'||view.bubble.textContent==='正在整理…') view.bubble.textContent='';
     const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
-    note(view,text,!controller.signal.aborted||timedOut);
+    for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
+    note(view,text+' 已提交的工单不会因停止生成而撤销。',!controller.signal.aborted||timedOut);
     const retry=document.createElement('button');retry.type='button';retry.className='retry';retry.textContent='重新编辑';retry.onclick=()=>{if(!active){$('message').value=message;syncInput();$('message').focus();}};view.article.append(retry);
     $('announcement').textContent=text;
   } finally {clearTimeout(timer);active=null;busy(false);$('message').focus();scrollDown();}
@@ -105,3 +109,15 @@ $('chat-mode').onclick=()=>{if(mode!=='chat')reset('chat');};
 $('extract-mode').onclick=()=>{if(mode!=='extract')reset('extract');};
 for(const button of document.querySelectorAll('[data-prompt]')) button.onclick=()=>{$('message').value=button.dataset.prompt;syncInput();$('message').focus();};
 fetch('/health').then(r=>{if(!r.ok)throw new Error();$('connection').textContent='服务已连接';$('connection').classList.add('online');}).catch(()=>{$('connection').textContent='服务未连接';});
+
+function updateToolBadge(view,data) {
+  const names={query_order:'查询订单',query_product:'查询商品',query_logistics:'查询物流',query_faq:'查询常见问题',create_ticket:'创建人工工单'};
+  const statuses={running:'查询中',retrying:'重试中',succeeded:'已完成',failed:'未完成',skipped:'本轮跳过'};
+  if(typeof data.tool_call_id!=='string'||!Object.hasOwn(statuses,data.status)) return;
+  let badge=view.badges.get(data.tool_call_id);
+  if(!badge) {badge=document.createElement('span');badge.className='tool-badge';view.badges.set(data.tool_call_id,badge);view.tools.append(badge);}
+  badge.dataset.status=data.status;
+  badge.textContent=(names[data.name]||'工具')+' · '+statuses[data.status];
+  badge.title=String(data.name)+' · '+data.tool_call_id;
+  badge.setAttribute('aria-label',badge.textContent);scrollDown();
+}

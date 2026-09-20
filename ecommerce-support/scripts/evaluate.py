@@ -80,6 +80,10 @@ def _chat_text(events: list[tuple[str, dict[str, Any]]]) -> str:
             if payload["finish_reason"] != "stop":
                 raise SSEParseError(f"finish_reason {payload['finish_reason']} is not a complete success")
             done_count += 1
+        elif event == "answer_reset":
+            tokens.clear()
+        elif event in ("session", "tool_status"):
+            continue
         else:
             raise SSEParseError(f"unknown event: {event}")
     if done_count != 1:
@@ -157,25 +161,23 @@ def evaluate_cases(cases: dict[str, Any], client: httpx.Client) -> dict[str, Any
     for case in cases.get("chat_cases", []):
         started = time.perf_counter()
         result = {"id": case["id"], "kind": "chat", "passed": False, "criteria": []}
-        history: list[dict[str, str]] = []
+        conversation_id = None
         try:
             for turn_number, turn in enumerate(case["turns"], start=1):
                 with client.stream(
                     "POST",
                     "/chat",
-                    json={"message": turn["message"], "history": history},
+                    json={"message": turn["message"], "conversation_id": conversation_id},
                 ) as response:
                     response.raise_for_status()
-                    answer = _chat_text(parse_sse(response.iter_bytes()))
+                    events = parse_sse(response.iter_bytes())
+                    answer = _chat_text(events)
+                    sessions = [p["conversation_id"] for e, p in events if e == "session"]
+                    if sessions:
+                        conversation_id = sessions[-1]
                 for criterion in _contains_criteria(turn.get("expect", {}), answer):
                     criterion["name"] = f"turn {turn_number}: {criterion['name']}"
                     result["criteria"].append(criterion)
-                history.extend(
-                    [
-                        {"role": "user", "content": turn["message"]},
-                        {"role": "assistant", "content": answer},
-                    ]
-                )
             result["passed"] = all(item["passed"] for item in result["criteria"])
         except (httpx.HTTPError, SSEParseError, ValueError, KeyError, TypeError) as exc:
             result["error"] = f"{type(exc).__name__}: {exc}"

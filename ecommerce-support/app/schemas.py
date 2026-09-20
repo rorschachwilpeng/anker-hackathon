@@ -20,6 +20,7 @@ class HistoryMessage(BaseModel):
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    conversation_id: int | None = Field(default=None, gt=0, le=18446744073709551615)
     message: str = Field(max_length=16000)
     history: list[HistoryMessage] = Field(default_factory=list, max_length=40)
 
@@ -32,6 +33,8 @@ class ChatRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_complete_alternating_history(self) -> "ChatRequest":
+        if self.history:
+            raise ValueError("history 已迁移，请改用 conversation_id")
         if len(self.history) % 2:
             raise ValueError("history must contain complete user/assistant pairs")
         for index, item in enumerate(self.history):

@@ -1,0 +1,179 @@
+{
+  "summary": {
+    "total": 8,
+    "passed": 7,
+    "failed": 1
+  },
+  "results": [
+    {
+      "id": "exchange",
+      "kind": "extraction",
+      "passed": true,
+      "criteria": [
+        {
+          "name": "order_id equals expected",
+          "passed": true
+        },
+        {
+          "name": "request_type equals expected",
+          "passed": true
+        },
+        {
+          "name": "contains '大一码'",
+          "passed": true
+        }
+      ],
+      "latency_ms": 1867.28
+    },
+    {
+      "id": "refund",
+      "kind": "extraction",
+      "passed": true,
+      "criteria": [
+        {
+          "name": "order_id equals expected",
+          "passed": true
+        },
+        {
+          "name": "request_type equals expected",
+          "passed": true
+        },
+        {
+          "name": "contains '退款'",
+          "passed": true
+        }
+      ],
+      "latency_ms": 2057.35
+    },
+    {
+      "id": "return_refund",
+      "kind": "extraction",
+      "passed": true,
+      "criteria": [
+        {
+          "name": "order_id equals expected",
+          "passed": true
+        },
+        {
+          "name": "request_type equals expected",
+          "passed": true
+        },
+        {
+          "name": "contains '退货'",
+          "passed": true
+        },
+        {
+          "name": "contains '退款'",
+          "passed": true
+        }
+      ],
+      "latency_ms": 1555.37
+    },
+    {
+      "id": "logistics",
+      "kind": "extraction",
+      "passed": true,
+      "criteria": [
+        {
+          "name": "order_id equals expected",
+          "passed": true
+        },
+        {
+          "name": "request_type equals expected",
+          "passed": true
+        },
+        {
+          "name": "contains an allowed substring",
+          "passed": true
+        }
+      ],
+      "latency_ms": 1869.35
+    },
+    {
+      "id": "missing",
+      "kind": "extraction",
+      "passed": true,
+      "criteria": [
+        {
+          "name": "order_id equals expected",
+          "passed": true
+        },
+        {
+          "name": "request_type equals expected",
+          "passed": true
+        },
+        {
+          "name": "expected_solution equals expected",
+          "passed": true
+        }
+      ],
+      "latency_ms": 1639.48
+    },
+    {
+      "id": "phone_not_order",
+      "kind": "extraction",
+      "passed": true,
+      "criteria": [
+        {
+          "name": "order_id equals expected",
+          "passed": true
+        },
+        {
+          "name": "request_type equals expected",
+          "passed": true
+        },
+        {
+          "name": "contains '维修'",
+          "passed": true
+        }
+      ],
+      "latency_ms": 1621.6
+    },
+    {
+      "id": "follow_up_recalls_order",
+      "kind": "chat",
+      "passed": true,
+      "criteria": [
+        {
+          "name": "turn 1: contains 'DEMO20260910005'",
+          "passed": true
+        },
+        {
+          "name": "turn 2: contains 'DEMO20260910005'",
+          "passed": true
+        }
+      ],
+      "latency_ms": 6198.52
+    },
+    {
+      "id": "cannot_claim_refund_completed",
+      "kind": "chat",
+      "passed": false,
+      "criteria": [
+        {
+          "name": "turn 1: contains an allowed substring",
+          "passed": true
+        },
+        {
+          "name": "turn 1: excludes '退款已完成'",
+          "passed": false
+        },
+        {
+          "name": "turn 1: excludes '已为您退款'",
+          "passed": true
+        },
+        {
+          "name": "turn 1: excludes '退款已经完成'",
+          "passed": true
+        }
+      ],
+      "latency_ms": 3507.53
+    }
+  ],
+  "manual_review": {
+    "case": "cannot_claim_refund_completed",
+    "verdict": "lexical_false_positive",
+    "evidence": "抱歉，我无法直接为您办理退款，也不能确认退款已完成。退款需要由商家后台人工处理。",
+    "note": "自动分数仍保留7/8；否定句包含禁用字串，不构成已退款承诺。"
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "total": 7,
+  "passed": 7,
+  "results": [
+    {
+      "id": "logistics",
+      "passed": true,
+      "answer": "模拟数据：订单 1001 的物流状态是**已签收**，目前位于**杭州配送站**。",
+      "tool": "query_logistics",
+      "args": {
+        "order_id": "1001"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "source": "mock",
+          "notice": "随机生成的演示数据，不代表真实业务信息",
+          "order_id": "1001",
+          "status": "已签收",
+          "location": "杭州配送站"
+        },
+        "error": null
+      },
+      "conversation_id": 34,
+      "followup_answer": "1001"
+    },
+    {
+      "id": "faq-hit",
+      "passed": true,
+      "answer": "模拟数据：退货政策是签收后七天内，商品保持完好且符合退货条件可申请退货；具体以人工审核为准。",
+      "tool": "query_faq",
+      "args": {
+        "keyword": "退货政策"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "keyword": "退货政策",
+          "found": true,
+          "items": [
+            {
+              "id": 1,
+              "question": "退货政策是什么？",
+              "answer": "演示政策：签收后七天内，商品保持完好且符合退货条件可申请退货；具体以人工审核为准。",
+              "category": "售后"
+            }
+          ]
+        },
+        "error": null
+      },
+      "conversation_id": 36
+    },
+    {
+      "id": "faq-expected-miss",
+      "passed": true,
+      "answer": "抱歉，没有查到关于邮费的相关政策。",
+      "tool": "query_faq",
+      "args": {
+        "keyword": "邮费"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "keyword": "邮费",
+          "found": false,
+          "items": []
+        },
+        "error": null
+      },
+      "conversation_id": 37
+    },
+    {
+      "id": "product",
+      "passed": true,
+      "answer": "这是**模拟数据**：商品 P1001 的价格为 **95.53 元**，库存为 **48 件**。",
+      "tool": "query_product",
+      "args": {
+        "product_id": "P1001"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "source": "mock",
+          "notice": "随机生成的演示数据，不代表真实业务信息",
+          "product_id": "P1001",
+          "name": "演示商品 P1001",
+          "price": 95.53,
+          "stock": 48
+        },
+        "error": null
+      },
+      "conversation_id": 39
+    },
+    {
+      "id": "order",
+      "passed": true,
+      "answer": "订单 1001 的金额为 **193.28 元**（模拟数据）。",
+      "tool": "query_order",
+      "args": {
+        "order_id": "1001"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "source": "mock",
+          "notice": "随机生成的演示数据，不代表真实业务信息",
+          "order_id": "1001",
+          "status": "已完成",
+          "amount": 193.28
+        },
+        "error": null
+      },
+      "conversation_id": 40
+    },
+    {
+      "id": "ticket",
+      "passed": true,
+      "answer": "已为您创建咨询类型的人工工单，工单号为：T20e73689ac134b96af1c7375602856，当前状态为“待处理”。请注意，人工处理需要等待后续跟进。",
+      "tool": "create_ticket",
+      "args": {
+        "description": "需要人工说明客服服务范围",
+        "ticket_type": "咨询"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "ticket_no": "T20e73689ac134b96af1c7375602856",
+          "conversation_id": 41,
+          "ticket_type": "咨询",
+          "status": "待处理"
+        },
+        "error": null
+      },
+      "conversation_id": 41
+    },
+    {
+      "id": "greeting",
+      "passed": true,
+      "answer": "你好！我是电商客服助手，可以帮你查询订单状态、物流信息、商品价格和库存，以及解答商家政策等问题。请告诉我你需要什么帮助？",
+      "tool": null,
+      "conversation_id": 42
+    }
+  ]
+}

@@ -1,93 +1,110 @@
-# 电商客服对话 API
+# 电商智能客服 · 第 2 章
 
-这是一个无服务端会话状态的 FastAPI 示例：`/chat` 流式返回中文客服回复，`/after-sales/extract` 从用户描述中提取结构化售后诉求。服务只调用 `.env` 指定的 OpenAI 兼容模型，不查询订单、不执行退款，也不转接人工。
+FastAPI + SQLAlchemy + Docker MySQL + LangChain。现有聊天页支持模型自主选择一次业务工具，显示工具徽章，并流式生成最终回答。会话、消息、工具申请/结果和人工工单落库；售后结构化提取功能保留。
 
-## 安装和启动
+## 启动
 
-需要 Python 3.12 或更高版本。在项目目录执行：
+需要 Python 3.12+ 和已启动的 Docker Desktop。当前项目已配置并启动，可直接打开 http://127.0.0.1:8000/ 。全新安装：
 
 ```bash
+cd "/Users/qingyili/Documents/ChatGPT/AI客服/ecommerce-support"
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
 test -e .env || cp .env.example .env
 ```
 
-最后一条命令只会在 `.env` 不存在时复制示例。首次安装后编辑 `.env`，填写实际的 `OPENAI_BASE_URL`、`OPENAI_MODEL` 和 `OPENAI_API_KEY`；不要提交该文件。
-
-只监听本机地址启动服务：
+填写 `.env` 中模型地址、模型名、密钥，以及随机的 MySQL root/应用密码；`DATABASE_URL` 的密码与 `MYSQL_PASSWORD` 一致。不要覆盖已填写的 `.env` 或提交密钥。新卷首次初始化才使用 MySQL 环境变量，修改密码不会自动修改既有数据库账户。
 
 ```bash
+docker compose up -d --wait
+.venv/bin/python scripts/init_db.py
 .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## 调用示例
+MySQL 8.4 仅暴露 `127.0.0.1:3307`，使用项目命名卷。初始化采用用户提供的 `sql/ch02-schema.sql`，仅创建缺失表，检查既有结构并幂等灌入演示数据，不删除已有数据。结构不兼容会拒绝初始化。启动应用前先初始化数据库。不要通过 `docker compose down -v` 清理持久数据。
 
-### 直接使用聊天网页
+## 浏览器演示
 
-启动后用浏览器打开 **http://127.0.0.1:8000/**（或 `/chat`）。页面支持客服对话、流式回复、停止生成、新对话，以及售后提取和 JSON 查看。
+打开 http://127.0.0.1:8000/ ，分别点击“新对话”后输入：
 
-浏览器会自动携带当前页面中的完整对话历史。刷新页面、切换功能或点击“新对话”会清空历史；失败、停止和截断的回复不加入后续上下文。历史不会存到浏览器本地存储。
+1. **订单 1001 的物流到哪了**：显示“查询物流”徽章，按随机模拟结果作答。
+2. **退货政策是什么**：显示“查询常见问题”，从 MySQL FAQ 命中七天退货演示政策。
+3. **邮费是多少**：查询仍执行成功，但字面关键词“邮费”匹配不到“运费标准”，回答没有查到。这是预期漏召回，未使用向量或同义词检索。
 
-GET `/chat` 返回网页，POST `/chat` 仍然是下面的流式 API。
+也可以问“商品 P1001 的价格和库存”“订单 1001 的金额”，或明确要求创建咨询工单。订单、商品、物流都是 mock；工单会实际写入本地 tickets 表。
 
-第一轮对话使用 `curl -N` 立即显示 SSE 增量：
+本页自动保留当前 conversation_id。新对话、刷新和切换功能会开始新的页面会话，已存数据库记录保留；本章没有历史列表。停止生成不撤销已提交的工单。不同 HTTP 请求不自动去重，避免对已经成功的工单重复提问。
+
+## curl 与多轮上下文
 
 ```bash
-curl -N -X POST http://127.0.0.1:8000/chat \
+curl -N http://127.0.0.1:8000/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message":"我的订单号是 DEMO20260910005，衣服尺码不合适。","history":[]}'
+  -d '{"message":"订单 1001 的物流到哪了"}'
 ```
 
-服务不保存上一轮。第二轮必须把第一轮真实的 user 和 assistant 内容作为完整历史传回；下面的 assistant 文本只是可替换示例：
+从首个 `session` 事件读取 conversation_id，下一轮填入实际 id（以下 1 仅为示例）：
 
 ```bash
-curl -N -X POST http://127.0.0.1:8000/chat \
+curl -N http://127.0.0.1:8000/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message":"我刚才说的订单号是什么？","history":[{"role":"user","content":"我的订单号是 DEMO20260910005，衣服尺码不合适。"},{"role":"assistant","content":"收到订单 DEMO20260910005。请问您希望换货还是退货？"}]}'
-```
-
-结构化售后提取：
-
-```bash
-curl -X POST http://127.0.0.1:8000/after-sales/extract \
+  -d '{"message":"我刚才问的是哪个订单号？","conversation_id":1}'
+curl -N http://127.0.0.1:8000/chat \
+  -H 'Content-Type: application/json' -d '{"message":"退货政策是什么"}'
+curl -N http://127.0.0.1:8000/chat \
+  -H 'Content-Type: application/json' -d '{"message":"邮费是多少"}'
+curl http://127.0.0.1:8000/after-sales/extract \
   -H 'Content-Type: application/json' \
-  -d '{"description":"订单 DEMO20260910001 的衣服太小了，我想换大一码。"}'
+  -d '{"description":"演示订单 DEMO1001 的衣服太小了，我想换大一码。"}'
 ```
 
-## 测试和标注评测
+非空旧 `history` 返回 422 迁移提示；空数组兼容。服务端加载数据库历史，不相信客户端工具流水。
 
-```bash
-.venv/bin/python -m pytest -q
-.venv/bin/python scripts/evaluate.py --base-url http://127.0.0.1:8000
-```
-
-评测器读取 `evals/cases.json`，把每项标准、耗时与通过状态写到 `evals/latest-results.json`。任一字段、子串、SSE 或 HTTP 标准失败时退出码为 1；请求只执行一次，不自动重试。样例均为合成数据。该结果只说明当前模型在这组样例上的表现，不代表所有输入均正确。
-
-## 接口语义
-
-`POST /chat` 接受 `message` 和完整的 `history`。历史只能由成对的 `user`、`assistant` 消息组成。成功流包含以下事件：
+## 事件与调用边界
 
 ```text
+event: session
+data: {"conversation_id":1}
+
+event: tool_status
+data: {"name":"query_logistics","tool_call_id":"call_x","status":"running","attempt":1}
+
+event: tool_status
+data: {"name":"query_logistics","tool_call_id":"call_x","status":"succeeded","attempt":1}
+
 event: token
-data: {"text":"增量内容"}
+data: {"text":"模拟数据："}
 
 event: done
 data: {"finish_reason":"stop"}
 ```
 
-`token` 是上游增量文本块，不保证对应一个 tokenizer token。若上游失败，服务发送 `error` 事件：
+若模型先输出引导语再发工具申请，会发送 `answer_reset` 清掉临时文本，再显示工具后的最终回答；消费者须重置本轮累计正文。
 
-```text
-event: error
-data: {"code":"upstream_error","message":"模型服务暂时不可用，请稍后重试。"}
+每次用户提问最多实际执行一个工具。若模型申请多个，第一个执行，其余保存 skipped 配对结果；回灌请求不开放工具，并显式设置 tool_choice=none，不能进入 Agent Loop。参数错误和未知工具不执行；暂时故障/超时最多重试一次。工单在同一次执行内复用 ticket_no，主键冲突须核对内容；创建工单与会话转人工同事务提交。
+
+最终正文只在完整生成并保存后发送 done(stop)。length 是截断，正文不存为完整历史；error 后不发 done。已保存的 user/工具流水仍保留，不完整轮次不回放。异常详情只记录脱敏类别。token 指上游实际文本增量块，并不保证一帧恰好一个 tokenizer token。
+
+HTTP 校验 422、预算超限 413、会话缺失 404、同会话繁忙 409、流前数据库不可用 503。售后提取继续通过 with_structured_output 返回 order_id/request_type/expected_solution。
+
+## 测试与评估
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python -m pip check
+.venv/bin/python scripts/evaluate_ch02.py
+.venv/bin/python scripts/evaluate.py --base-url http://127.0.0.1:8000
 ```
 
-`error` 后流立即结束，不再发送 `done`；空流或缺少 `done` 也不算成功。`done` 的 `finish_reason=length` 表示输出因长度限制被截断，评测器会把它记为失败，只有 `stop` 算完整成功。开始流式响应前的请求校验失败返回 422，上下文预算超限返回 413。`POST /after-sales/extract` 成功返回且只返回 `order_id`、`request_type`、`expected_solution`，模型输出或解析失败返回脱敏的 502。
+数据库测试需要运行中的已初始化 MySQL。当前使用唯一 `test-` 用户与随机工单号写入本地演示库，不清表；不应用到生产库。独立测试库授权步骤被环境自动审批拒绝，未更改权限。缺少 DATABASE_URL 时数据库测试跳过，不能把这种运行宣称为 MySQL 验收。
 
-## 限制
+第 2 章标注集在 `evals/ch02-cases.json`，报告为 `evals/ch02-results.json`。评估检查 SSE、模型选择的工具和参数、数据库调用/结果配对、最终正文落库、模拟物流答案与结果一致、工单真实存在及两轮回忆。任一失败退出非零，不自动重试。报告只证明这些合成样例，不保证任意输入下的模型行为。
 
-- 服务端无数据库和会话存储；客户端必须保存并传回历史，重启服务也不会恢复会话。
-- 服务无法核验订单状态或执行售后动作，因此不应把自然语言回复当作业务操作凭据。
-- `CONTEXT_WINDOW_TOKENS` 必须按所选模型配置。当前预算使用保守的 UTF-8 字节估算，不是提供商原生 tokenizer 的精确计数。
-- 模型端点必须兼容所用 OpenAI 接口；结构化提取默认要求 `json_mode`。提供商不支持流式输出或结构化模式时请求会失败，不会自动更换模型或降级。
-- 上游模型和网络可能偶发失败；调用方应只在明确决定后发起新的重试请求。
+## 边界
+
+- 仅本机单用户、单 worker 演示，无登录鉴权、跨进程会话锁或真实人工工作台；不可直接公开部署。
+- 本章没有 Agent Loop、RAG、向量库或真实电商接口。FAQ 只在问题列做转义后的 SQL LIKE 字面匹配。
+- UTF-8 字节保守估计预算，覆盖提示、工具定义、参数与返回预留，历史按完整轮次裁剪。不是模型原生 tokenizer 精确计数；长输入可能提前返回 413。
+- 模型须支持 OpenAI 兼容工具协议、流式输出和 JSON 模式；不兼容不会自动换模型。
+- 表结构没有消息完成状态字段，中断原因在运行日志，数据库不完整轮次通过消息结构识别。
+- 过程记录：仓库 `dev-notes/ch02.md`；设计与计划在 `docs/superpowers/`。
