@@ -1,0 +1,125 @@
+{
+  "total": 12,
+  "passed": 12,
+  "positive_accuracy": 1.0,
+  "safe_negative_accuracy": 1.0,
+  "results": [
+    {
+      "case": "positive_return",
+      "expected": 1,
+      "valid_count": 1,
+      "passed": true,
+      "valid_items": [
+        {
+          "conversation_id": 101,
+          "question": "退货政策是什么？",
+          "answer": "商品签收后七天内可以申请退货。",
+          "category": "退货政策",
+          "evidence_message_ids": [
+            1010,
+            1011
+          ]
+        }
+      ]
+    },
+    {
+      "case": "positive_invoice",
+      "expected": 1,
+      "valid_count": 1,
+      "passed": true,
+      "valid_items": [
+        {
+          "conversation_id": 102,
+          "question": "电子发票在哪里下载？",
+          "answer": "订单完成后可以在订单详情页下载电子发票。",
+          "category": "发票下载",
+          "evidence_message_ids": [
+            1020,
+            1021
+          ]
+        }
+      ]
+    },
+    {
+      "case": "positive_warranty",
+      "expected": 1,
+      "valid_count": 1,
+      "passed": true,
+      "valid_items": [
+        {
+          "conversation_id": 103,
+          "question": "保修期怎么计算？",
+          "answer": "保修期从商品签收日期开始计算。",
+          "category": "保修政策",
+          "evidence_message_ids": [
+            1030,
+            1031
+          ]
+        }
+      ]
+    },
+    {
+      "case": "cross_conversation",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "mock_tool",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "mock_answer",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "phone_pii",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "order_pii",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "unsupported_promise",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "failure_reply",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "prompt_injection",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    },
+    {
+      "case": "empty_conversation",
+      "expected": 0,
+      "valid_count": 0,
+      "passed": true,
+      "valid_items": []
+    }
+  ]
+}

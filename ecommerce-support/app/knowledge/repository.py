@@ -1,9 +1,12 @@
 from dataclasses import asdict
+import hashlib
+import json
 from sqlalchemy import select, insert, update, delete, func
-from app.knowledge.models import knowledge_chunks as chunks
+from app.knowledge.models import knowledge_chunks as chunks, qa_extraction_staging as staging
 from app.knowledge.types import ChunkDraft, ChunkSnapshot, KnowledgeError
 from app.knowledge.text import content_hash, embedding_text
 from app.knowledge.state import source_state_key
+from app.models import conversations, messages
 
 
 def snapshot(row):
@@ -106,3 +109,64 @@ class KnowledgeRepository:
         async with self.sessions() as s:
             rows=(await s.execute(select(chunks.c.vectorize_status,func.count()).group_by(chunks.c.vectorize_status))).all()
         return {'pending':0,'done':0,**dict(rows),'pending_deletes':len(await self.tombstones())}
+
+    async def completed_sources(self):
+        """Read a stable set of ended conversations and a fixed message high-water mark."""
+        async with self.sessions() as s:
+            upper=(await s.execute(select(func.max(messages.c.id)))).scalar() or 0
+            conversation_ids=list((await s.execute(
+                select(conversations.c.id).where(conversations.c.status=='已结束').order_by(conversations.c.id)
+            )).scalars())
+            if not conversation_ids:
+                return []
+            rows=(await s.execute(
+                select(messages).where(
+                    messages.c.conversation_id.in_(conversation_ids), messages.c.id<=upper
+                ).order_by(messages.c.conversation_id,messages.c.id)
+            )).mappings().all()
+        grouped={ident:[] for ident in conversation_ids}
+        for row in rows:
+            grouped[row['conversation_id']].append(dict(row))
+        result=[]
+        for ident in conversation_ids:
+            material=json.dumps(grouped[ident],ensure_ascii=False,separators=(',',':'),default=str)
+            result.append({'id':ident,'fingerprint':hashlib.sha256(material.encode()).hexdigest(),'messages':grouped[ident]})
+        return result
+
+    async def processed_fingerprints(self):
+        result={}
+        for key,payload in await self.state.entries('mining:source:'):
+            try:result[int(key.rsplit(':',1)[1])]=payload['fingerprint']
+            except (KeyError,ValueError):continue
+        return result
+
+    async def prepare_mining_run(self,run_id,batches):
+        await self.state.put('mining:run:'+hashlib.sha256(run_id.encode()).hexdigest(),{
+            'run_id':run_id,'status':'planned','batches':batches,
+        })
+
+    async def commit_mining_run(self,run_id,accepted,rejected,sources):
+        """Persist staging rows, evidence metadata, and source fingerprints atomically."""
+        run_key='mining:run:'+hashlib.sha256(run_id.encode()).hexdigest()
+        batch_no=hashlib.sha256(run_id.encode()).hexdigest()[:32]
+        async with self.sessions.begin() as s:
+            for status,items in (('extracted',accepted),('discarded',rejected)):
+                for item in items:
+                    result=await s.execute(insert(staging).values(
+                        batch_no=batch_no,source_ref=str(item['conversation_id']),question=item['question'],
+                        answer=item['answer'],status=status,
+                    ))
+                    staging_id=result.inserted_primary_key[0]
+                    await self.state.put('mining:qa:'+str(staging_id),{
+                        'conversation_id':item['conversation_id'],'category':item.get('category',''),
+                        'evidence_message_ids':item.get('evidence_message_ids',[]),
+                    },s)
+            for source in sources:
+                await self.state.put('mining:source:'+str(source['id']),{
+                    'conversation_id':source['id'],'fingerprint':source['fingerprint'],
+                    'message_upper_bound':max((m['id'] for m in source['messages']),default=0),
+                },s)
+            await self.state.put(run_key,{
+                'run_id':run_id,'status':'committed','accepted':len(accepted),'rejected':len(rejected),
+                'source_ids':[source['id'] for source in sources],
+            },s)
