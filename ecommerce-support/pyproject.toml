@@ -13,6 +13,7 @@ dependencies = [
   "aiomysql",
   "cryptography",
   "httpx",
+  "pymilvus==2.6.17",
   "langchain-core",
   "langchain-openai",
   "pydantic-settings",
