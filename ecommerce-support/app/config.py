@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     knowledge_tool_timeout: float = Field(default=20, gt=0, le=60)
     knowledge_worker_enabled: bool = False
     knowledge_worker_timezone: str = 'Asia/Shanghai'
-    knowledge_extraction_max_tokens: int = Field(default=2048, ge=512, le=8192)
+    knowledge_extraction_max_tokens: int = Field(default=4096, ge=512, le=8192)
 
     def ensure_knowledge_ready(self, *, search: bool = True) -> None:
         if not self.embedding_api_key or not self.embedding_api_key.get_secret_value().strip():

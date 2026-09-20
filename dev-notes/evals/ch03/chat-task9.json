@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-09-20T12:44:44.507336+00:00",
+  "passed": true,
+  "case": {
+    "case_id": "h01",
+    "query": "邮费是多少",
+    "expected": "未满99元收取8元运费",
+    "actual_source_ids": [
+      124
+    ],
+    "expected_source_id": 124,
+    "evidence": "订单实付满99元包邮，未满99元收取8元运费。偏远地区及大件商品不适用包邮，具体费用以结算页展示为准。",
+    "http_status": 200,
+    "passed": true
+  }
+}

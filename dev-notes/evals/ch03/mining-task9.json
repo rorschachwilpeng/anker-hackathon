@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-09-20T13:03:09.816256+00:00",
+  "synthetic_only": true,
+  "conversation_id": 85,
+  "first": {
+    "run_id": "synthetic-cc28867ab60845658387c95295110592",
+    "extraction": {
+      "scanned": 1,
+      "staged": 1,
+      "rejected": 0
+    },
+    "dedup": {
+      "candidates": 1,
+      "new": 1,
+      "merge": 0,
+      "discard": 0,
+      "review": 0
+    },
+    "vectorization": {
+      "pending": 0,
+      "done": 13,
+      "pending_deletes": 0
+    }
+  },
+  "second": {
+    "run_id": "synthetic-cc28867ab60845658387c95295110592",
+    "extraction": {
+      "scanned": 1,
+      "staged": 0,
+      "rejected": 0
+    },
+    "dedup": {
+      "candidates": 0,
+      "new": 0,
+      "merge": 0,
+      "discard": 0,
+      "review": 0
+    },
+    "vectorization": {
+      "pending": 0,
+      "done": 13,
+      "pending_deletes": 0
+    }
+  },
+  "staging_ids": [
+    31
+  ],
+  "chunk_ids": [
+    145
+  ],
+  "passed": true
+}

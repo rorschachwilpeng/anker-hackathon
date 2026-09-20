@@ -1,0 +1,141 @@
+event: session
+data: {"conversation_id":82}
+
+event: tool_status
+data: {"name":"query_faq","tool_call_id":"call_px27wna1kpx1u1vg0yr7kmxz","status":"running","attempt":1}
+
+event: tool_status
+data: {"name":"query_faq","tool_call_id":"call_px27wna1kpx1u1vg0yr7kmxz","status":"succeeded","attempt":1}
+
+event: token
+data: {"text":"根据"}
+
+event: token
+data: {"text":"商家"}
+
+event: token
+data: {"text":"政策"}
+
+event: token
+data: {"text":"："}
+
+event: token
+data: {"text":"订单"}
+
+event: token
+data: {"text":"实"}
+
+event: token
+data: {"text":"付"}
+
+event: token
+data: {"text":"满"}
+
+event: token
+data: {"text":"99"}
+
+event: token
+data: {"text":"元"}
+
+event: token
+data: {"text":"包"}
+
+event: token
+data: {"text":"邮"}
+
+event: token
+data: {"text":"，"}
+
+event: token
+data: {"text":"未"}
+
+event: token
+data: {"text":"满"}
+
+event: token
+data: {"text":"99"}
+
+event: token
+data: {"text":"元"}
+
+event: token
+data: {"text":"收取"}
+
+event: token
+data: {"text":"8"}
+
+event: token
+data: {"text":"元"}
+
+event: token
+data: {"text":"运费"}
+
+event: token
+data: {"text":"；"}
+
+event: token
+data: {"text":"偏远"}
+
+event: token
+data: {"text":"地区"}
+
+event: token
+data: {"text":"及"}
+
+event: token
+data: {"text":"大"}
+
+event: token
+data: {"text":"件"}
+
+event: token
+data: {"text":"商品"}
+
+event: token
+data: {"text":"不"}
+
+event: token
+data: {"text":"适用"}
+
+event: token
+data: {"text":"包"}
+
+event: token
+data: {"text":"邮"}
+
+event: token
+data: {"text":"，"}
+
+event: token
+data: {"text":"具体"}
+
+event: token
+data: {"text":"以"}
+
+event: token
+data: {"text":"结算"}
+
+event: token
+data: {"text":"页"}
+
+event: token
+data: {"text":"展示"}
+
+event: token
+data: {"text":"为准"}
+
+event: token
+data: {"text":"。（"}
+
+event: token
+data: {"text":"模拟"}
+
+event: token
+data: {"text":"数据"}
+
+event: token
+data: {"text":"）"}
+
+event: done
+data: {"finish_reason":"stop"}
+
