@@ -1,13 +1,14 @@
 {
-  "timestamp": "2026-09-20T13:03:09.816256+00:00",
+  "timestamp": "2026-09-21T03:47:16.677603+00:00",
   "synthetic_only": true,
-  "conversation_id": 85,
+  "conversation_id": 95,
   "first": {
-    "run_id": "synthetic-cc28867ab60845658387c95295110592",
+    "run_id": "synthetic-8b3bff213bf84b6899afb0a0bff203d3",
     "extraction": {
       "scanned": 1,
       "staged": 1,
-      "rejected": 0
+      "rejected": 0,
+      "skipped": 0
     },
     "dedup": {
       "candidates": 1,
@@ -23,11 +24,12 @@
     }
   },
   "second": {
-    "run_id": "synthetic-cc28867ab60845658387c95295110592",
+    "run_id": "synthetic-8b3bff213bf84b6899afb0a0bff203d3",
     "extraction": {
       "scanned": 1,
       "staged": 0,
-      "rejected": 0
+      "rejected": 0,
+      "skipped": 0
     },
     "dedup": {
       "candidates": 0,
@@ -43,10 +45,10 @@
     }
   },
   "staging_ids": [
-    31
+    55
   ],
   "chunk_ids": [
-    145
+    197
   ],
   "passed": true
 }

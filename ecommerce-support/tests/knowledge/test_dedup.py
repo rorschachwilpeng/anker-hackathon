@@ -39,13 +39,73 @@ async def test_exact_duplicate_is_discarded_without_model_or_embeddings():
 async def test_same_fact_new_wording_merges_without_rewriting_answer():
     from app.knowledge.dedup import Deduplicator
 
-    class Never:
-        def __getattr__(self, name):
-            raise AssertionError(name)
+    from app.knowledge.dedup import DedupDecision
 
-    decision = await Deduplicator(Never(), Never()).decide(candidate(question="配送费怎么收"), [existing()])
+    class Embeddings:
+        async def encode(self, texts):
+            return [[1.0, 0.0] for _ in texts]
+
+    class Structured:
+        async def ainvoke(self, messages):
+            return DedupDecision(action="merge", target_id=7, reason="same fact")
+
+    class Model:
+        def with_structured_output(self, schema, *, method):
+            return Structured()
+
+    decision = await Deduplicator(Model(), Embeddings()).decide(candidate(question="配送费怎么收"), [existing()])
     assert decision.action == "merge"
     assert decision.target_id == 7
+
+
+@pytest.mark.asyncio
+async def test_same_short_answer_for_different_categories_is_not_auto_merged():
+    from app.knowledge.dedup import DedupDecision, Deduplicator
+
+    class Embeddings:
+        async def encode(self, texts):
+            return [[1.0, 0.0] for _ in texts]
+
+    class Structured:
+        async def ainvoke(self, messages):
+            return DedupDecision(action="new", reason="different facts")
+
+    class Model:
+        def with_structured_output(self, schema, *, method):
+            return Structured()
+
+    decision = await Deduplicator(Model(), Embeddings()).decide(
+        candidate(category="售后", question="拆封后还能退吗", answer="不可以。"),
+        [existing(category="配送", questions="能寄到海外吗", answer="不可以。")],
+    )
+    assert decision.action == "new"
+
+
+@pytest.mark.asyncio
+async def test_too_large_new_knowledge_stays_in_review_not_pending(knowledge_repo):
+    from app.knowledge.dedup import DedupDecision
+    from app.knowledge.models import knowledge_chunks, qa_extraction_staging
+
+    answer = "长" * 2100
+    async with knowledge_repo.sessions.begin() as session:
+        result = await session.execute(insert(qa_extraction_staging).values(
+            batch_no="dedup-large", source_ref="900003", question="超长答案", answer=answer, status="extracted"
+        ))
+        staging_id = result.inserted_primary_key[0]
+    row = {"staging_id": staging_id, "conversation_id": 900003, "category": "测试", "question": "超长答案", "answer": answer}
+    try:
+        assert await knowledge_repo.apply_dedup(row, DedupDecision(action="new", reason="new")) is None
+        async with knowledge_repo.sessions() as session:
+            status = (await session.execute(select(qa_extraction_staging.c.status).where(qa_extraction_staging.c.id == staging_id))).scalar_one()
+            count = (await session.execute(select(knowledge_chunks.c.id).where(knowledge_chunks.c.answer == answer))).first()
+        decision = await knowledge_repo.state.get("dedup:staging:" + str(staging_id))
+        assert status == "extracted"
+        assert count is None
+        assert decision["action"] == "review"
+        assert decision["reason"] == "knowledge_too_large"
+    finally:
+        async with knowledge_repo.sessions.begin() as session:
+            await session.execute(delete(qa_extraction_staging).where(qa_extraction_staging.c.id == staging_id))
 
 
 @pytest.mark.asyncio
@@ -87,7 +147,7 @@ async def test_semantic_candidate_uses_top_five_and_validates_model_target():
     assert decision.action == "new"
     assert captured["schema"] is DedupDecision
     assert captured["method"] == "json_mode"
-    assert len(captured["texts"]) == 8
+    assert len(captured["texts"]) == 7
 
 
 @pytest.mark.asyncio
@@ -103,7 +163,7 @@ async def test_retryable_embedding_failure_is_retried(monkeypatch):
             calls += 1
             if calls == 1:
                 raise EmbeddingError("temporary", retryable=True)
-            return [[1.0, 0.0], [1.0, 0.0]]
+            return [[1.0, 0.0] for _ in texts]
 
     class Structured:
         async def ainvoke(self, messages):
@@ -121,7 +181,7 @@ async def test_retryable_embedding_failure_is_retried(monkeypatch):
         candidate(question="不同问题", answer="不同答案"), [existing()]
     )
     assert decision.action == "new"
-    assert calls == 2
+    assert calls == 3
 
 
 @pytest.mark.asyncio
@@ -130,6 +190,21 @@ async def test_missing_category_is_review_without_model_call():
 
     decision = await Deduplicator(None, None).decide(candidate(category=""), [])
     assert decision.action == "review"
+
+
+@pytest.mark.asyncio
+async def test_oversized_candidate_is_reviewed_before_embedding_call():
+    from app.knowledge.dedup import Deduplicator
+
+    class Never:
+        def __getattr__(self, name):
+            raise AssertionError(name)
+
+    decision = await Deduplicator(Never(), Never()).decide(
+        candidate(answer="长" * 2100), [existing()]
+    )
+    assert decision.action == "review"
+    assert decision.reason == "knowledge_too_large"
 
 
 @pytest.mark.asyncio

@@ -62,11 +62,47 @@ def validate_evidence(item, conversations):
         return False
     if data["answer"] not in {str(row.get("content") or "").strip() for row in answer_rows}:
         return False
-    selected = "\n".join(str(row.get("content") or "") for row in evidence)
+    turns = []
+    current = []
+    for row in records:
+        if row.get("role") == "user" and current:
+            turns.append(current)
+            current = []
+        current.append(row)
+    if current:
+        turns.append(current)
+    evidence_ids = set(data["evidence_message_ids"])
+    matching_turns = [turn for turn in turns if evidence_ids.issubset({row.get("id") for row in turn})]
+    if len(matching_turns) != 1:
+        return False
+    turn = matching_turns[0]
+    selected = "\n".join(str(row.get("content") or "") for row in turn)
     if _PHONE.search(selected) or _ORDER.search(selected):
         return False
     if _INJECTION.search(data["question"]) or _FAILURE.search(data["answer"]) or _MOCK.search(selected):
         return False
-    if any(row.get("role") == "tool" or row.get("tool_calls") for row in evidence):
+    calls = {
+        call.get("id")
+        for row in turn
+        for call in (row.get("tool_calls") or [])
+        if isinstance(call, dict) and call.get("id")
+    }
+    tool_ids = {row.get("tool_call_id") for row in turn if row.get("role") == "tool"}
+    tool_text = "\n".join(str(row.get("content") or "") for row in turn if row.get("role") == "tool")
+    if calls != tool_ids or _MOCK.search(tool_text) or _FAILURE.search(tool_text):
+        return False
+    for row in turn:
+        if row.get("role") != "tool":
+            continue
+        try:
+            payload = json.loads(str(row.get("content") or ""))
+        except (json.JSONDecodeError, TypeError):
+            return False
+        if (not isinstance(payload, dict) or payload.get("ok") is not True
+                or payload.get("error") not in (None, {})):
+            return False
+    if (turn[0].get("role") != "user" or turn[-1].get("role") != "assistant"
+            or turn[-1].get("tool_calls") or turn[-1].get("id") not in evidence_ids
+            or str(turn[-1].get("content") or "").strip() != data["answer"]):
         return False
     return True

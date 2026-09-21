@@ -1,4 +1,4 @@
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import hashlib
 import json
 from sqlalchemy import select, insert, update, delete, func
@@ -12,6 +12,24 @@ from app.models import conversations, messages
 def snapshot(row):
     draft=ChunkDraft(**{key:row[key] for key in ChunkDraft.__dataclass_fields__})
     return ChunkSnapshot(row['id'],draft,content_hash(draft))
+
+
+def validate_draft(draft):
+    if not draft.category.strip() or not draft.questions.strip() or not draft.answer.strip():
+        raise KnowledgeError('empty_knowledge')
+    if (len(draft.category)>255 or len(draft.section_path or '')>512
+            or len(draft.content_type or '')>32 or len(embedding_text(draft).encode())>6000):
+        raise KnowledgeError('knowledge_too_large')
+
+
+def append_questions(base, additions):
+    values=[value for value in base.splitlines() if value.strip()]
+    known={' '.join(value.split()).casefold() for value in values}
+    for value in additions:
+        normalized=' '.join(value.split()).casefold()
+        if normalized and normalized not in known:
+            values.append(value);known.add(normalized)
+    return '\n'.join(values)
 
 
 class KnowledgeRepository:
@@ -36,10 +54,11 @@ class KnowledgeRepository:
 
     async def replace_source(self,source_key,drafts):
         await self.state.assert_owned()
-        for d in drafts:
-            if not d.category.strip() or not d.questions.strip() or not d.answer.strip():raise KnowledgeError('empty_knowledge')
-            if len(d.category)>255 or len(d.section_path or '')>512 or len(d.content_type or '')>32 or len(embedding_text(d).encode())>6000:
-                raise KnowledgeError('knowledge_too_large')
+        merge_entries=await self.state.entries('mining:merge:')
+        mappings={}
+        for merge_key,payload in merge_entries:
+            if payload.get('status')!='review' and payload.get('target_id') is not None:
+                mappings.setdefault(payload['target_id'],[]).append((merge_key,payload))
         key=source_state_key(source_key)
         async with self.sessions.begin() as s:
             if not await self.config_matches(s):raise KnowledgeError('embedding_config_changed')
@@ -48,8 +67,25 @@ class KnowledgeRepository:
             rows={}
             if previous_ids:
                 rows={r['id']:r for r in (await s.execute(select(chunks).where(chunks.c.id.in_(previous_ids)).with_for_update())).mappings()}
-            ids=[]; result=[]
+            ids=[]; result=[]; stale=[]; effective=[]
             for i,d in enumerate(drafts):
+                old=rows.get(previous_ids[i]) if i<len(previous_ids) else None
+                linked=mappings.get(old['id'],[]) if old else []
+                if linked:
+                    additions=[payload['question'] for _,payload in linked]
+                    mapped={' '.join(value.split()).casefold() for value in additions}
+                    old_questions=[value for value in str(old['questions']).splitlines()
+                                   if ' '.join(value.split()).casefold() not in mapped]
+                    old_base=replace(snapshot(old).draft,questions='\n'.join(old_questions))
+                    if content_hash(old_base)==content_hash(d):
+                        d=replace(d,questions=append_questions(d.questions,additions))
+                    else:
+                        stale.extend(linked)
+                validate_draft(d)
+                effective.append(d)
+            for ident in previous_ids[len(drafts):]:
+                stale.extend(mappings.get(ident,[]))
+            for i,d in enumerate(effective):
                 old=rows.get(previous_ids[i]) if i<len(previous_ids) else None
                 values=asdict(d)
                 if old:
@@ -67,6 +103,14 @@ class KnowledgeRepository:
                 await s.execute(delete(chunks).where(chunks.c.id.in_(removed)))
             await self.state.put(key,{'source':source_key,'ids':ids,'hashes':[r.content_hash for r in result],
                                      'deleted_ids':list(dict.fromkeys(previous.get('deleted_ids',[])+removed))},s)
+            for merge_key,payload in stale:
+                staging_id=int(merge_key.rsplit(':',1)[1])
+                await s.execute(update(staging).where(staging.c.id==staging_id).values(status='extracted'))
+                await self.state.put('dedup:staging:'+str(staging_id),{
+                    'action':'review','target_id':payload.get('target_id'),
+                    'reason':'authoritative_source_changed',
+                },s)
+                await self.state.put(merge_key,{**payload,'status':'review'},s)
             return result
 
     async def pending(self,limit=16):
@@ -140,13 +184,83 @@ class KnowledgeRepository:
             except (KeyError,ValueError):continue
         return result
 
-    async def prepare_mining_run(self,run_id,batches):
-        await self.state.put('mining:run:'+hashlib.sha256(run_id.encode()).hexdigest(),{
-            'run_id':run_id,'status':'planned','batches':batches,
-        })
+    async def prepare_mining_run(self,run_id,plan):
+        await self.state.assert_owned()
+        key='mining:run:'+hashlib.sha256(run_id.encode()).hexdigest()
+        async with self.sessions.begin() as s:
+            existing=await self.state.get(key,s,True)
+            if existing and existing.get('status')=='planned':
+                return existing
+            await self.state.put(key,plan,s)
+            return {'schema_version':1,**plan}
+
+    async def assert_writer_owned(self):
+        await self.state.assert_owned()
+
+    async def completed_mining_batches(self,batch_nos):
+        wanted=set(batch_nos)
+        return {
+            key.rsplit(':',1)[1]:payload
+            for key,payload in await self.state.entries('mining:batch:')
+            if key.rsplit(':',1)[1] in wanted and payload.get('status')=='committed'
+        }
+
+    async def commit_mining_batch(self,run_id,batch_no,accepted,rejected):
+        await self.state.assert_owned()
+        batch_key='mining:batch:'+batch_no
+        async with self.sessions.begin() as s:
+            if await self.state.get(batch_key,s,True):
+                return False
+            for status,items in (('extracted',accepted),('discarded',rejected)):
+                for item in items:
+                    duplicate=(await s.execute(select(staging.c.id,staging.c.status).where(
+                        staging.c.source_ref==str(item['conversation_id']),
+                        staging.c.question==item['question'],staging.c.answer==item['answer'],
+                    ).limit(1).with_for_update())).mappings().first()
+                    if duplicate is not None:
+                        prior_decision=await self.state.get('dedup:staging:'+str(duplicate['id']),s)
+                        if status=='extracted' and duplicate['status']=='discarded' and prior_decision is None:
+                            await s.execute(update(staging).where(staging.c.id==duplicate['id']).values(
+                                status='extracted',batch_no=batch_no,
+                            ))
+                            await self.state.put('mining:qa:'+str(duplicate['id']),{
+                                'conversation_id':item['conversation_id'],'category':item.get('category',''),
+                                'evidence_message_ids':item.get('evidence_message_ids',[]),
+                            },s)
+                        continue
+                    result=await s.execute(insert(staging).values(
+                        batch_no=batch_no,source_ref=str(item['conversation_id']),question=item['question'],
+                        answer=item['answer'],status=status,
+                    ))
+                    staging_id=result.inserted_primary_key[0]
+                    await self.state.put('mining:qa:'+str(staging_id),{
+                        'conversation_id':item['conversation_id'],'category':item.get('category',''),
+                        'evidence_message_ids':item.get('evidence_message_ids',[]),
+                    },s)
+            await self.state.put(batch_key,{
+                'run_id':run_id,'status':'committed','accepted':len(accepted),'rejected':len(rejected),
+            },s)
+        return True
+
+    async def finalize_mining_run(self,run_id,sources,*,skipped=None):
+        await self.state.assert_owned()
+        run_key='mining:run:'+hashlib.sha256(run_id.encode()).hexdigest()
+        async with self.sessions.begin() as s:
+            for source in sources:
+                reason=next((item['reason'] for item in (skipped or []) if item['source_id']==source['id']),None)
+                await self.state.put('mining:source:'+str(source['id']),{
+                    'conversation_id':source['id'],'fingerprint':source['fingerprint'],
+                    'message_upper_bound':max((m['id'] for m in source['messages']),default=0),
+                    **({'skipped_reason':reason} if reason else {}),
+                },s)
+            await self.state.put(run_key,{
+                'run_id':run_id,'status':'committed','source_ids':[source['id'] for source in sources],
+                'skipped':skipped or [],
+            },s)
 
     async def commit_mining_run(self,run_id,accepted,rejected,sources):
         """Persist staging rows, evidence metadata, and source fingerprints atomically."""
+        await self.state.assert_owned()
         run_key='mining:run:'+hashlib.sha256(run_id.encode()).hexdigest()
         batch_no=hashlib.sha256(run_id.encode()).hexdigest()[:32]
         async with self.sessions.begin() as s:
@@ -195,6 +309,7 @@ class KnowledgeRepository:
 
     async def apply_dedup(self,candidate,decision):
         """Apply one reviewed decision atomically; authoritative answers are never rewritten."""
+        await self.state.assert_owned()
         staging_id=candidate['staging_id']
         async with self.sessions.begin() as s:
             row=(await s.execute(select(staging).where(staging.c.id==staging_id).with_for_update())).mappings().first()
@@ -218,6 +333,12 @@ class KnowledgeRepository:
                 return dict(target) if target else None
             if action=='new':
                 draft=ChunkDraft(candidate['category'],candidate['question'],candidate['answer'],content_type='conversation')
+                try:validate_draft(draft)
+                except KnowledgeError as exc:
+                    await self.state.put('dedup:staging:'+str(staging_id),{
+                        'action':'review','target_id':None,'reason':exc.code,
+                    },s)
+                    return None
                 ident=(await s.execute(insert(chunks).values(**asdict(draft)))).inserted_primary_key[0]
                 if not 0<ident<2**63:raise KnowledgeError('knowledge_id_out_of_range')
                 digest=content_hash(draft)
@@ -226,17 +347,22 @@ class KnowledgeRepository:
                 },s)
                 result={'id':ident,'category':draft.category,'questions':draft.questions,'answer':draft.answer,'content_type':'conversation'}
             else:
-                questions=[value for value in target['questions'].splitlines() if value.strip()]
-                known={' '.join(value.split()).casefold() for value in questions}
-                if ' '.join(candidate['question'].split()).casefold() not in known:questions.append(candidate['question'])
+                questions=append_questions(target['questions'],[candidate['question']])
+                merged=replace(snapshot(target).draft,questions=questions)
+                try:validate_draft(merged)
+                except KnowledgeError as exc:
+                    await self.state.put('dedup:staging:'+str(staging_id),{
+                        'action':'review','target_id':target['id'],'reason':exc.code,
+                    },s)
+                    return None
                 await s.execute(update(chunks).where(chunks.c.id==target['id']).values(
-                    questions='\n'.join(questions),vectorize_status='pending',vector_id=None,
+                    questions=questions,vectorize_status='pending',vector_id=None,
                 ))
                 await self.state.put('mining:merge:'+str(staging_id),{
                     'target_id':target['id'],'question':candidate['question'],
                     'target_content_hash_before':snapshot(target).content_hash,
                 },s)
-                result={**dict(target),'questions':'\n'.join(questions)}
+                result={**dict(target),'questions':questions}
             await s.execute(update(staging).where(staging.c.id==staging_id).values(status='kept'))
             await self.state.put('dedup:staging:'+str(staging_id),{
                 'action':action,'target_id':result['id'],'reason':decision.reason,

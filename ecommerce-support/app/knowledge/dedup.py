@@ -1,6 +1,7 @@
 import asyncio
 import json
 import math
+import heapq
 import unicodedata
 from typing import Literal
 
@@ -48,6 +49,9 @@ class Deduplicator:
     async def decide(self, candidate, existing):
         if not str(candidate.get("category") or "").strip():
             return DedupDecision(action="review", reason="missing_category")
+        candidate_text = f'{candidate["category"]}\n{candidate["question"]}\n{candidate["answer"]}'
+        if len(candidate_text.encode()) > 6000:
+            return DedupDecision(action="review", reason="knowledge_too_large")
         question = normalize_text(candidate["question"])
         answer = normalize_text(candidate["answer"])
         for row in existing:
@@ -56,19 +60,22 @@ class Deduplicator:
                 if answer == normalize_text(row["answer"]):
                     return DedupDecision(action="discard", target_id=row["id"], reason="exact_duplicate")
                 return DedupDecision(action="review", target_id=row["id"], reason="same_question_conflicting_answer")
-        for row in existing:
-            if answer == normalize_text(row["answer"]):
-                return DedupDecision(action="merge", target_id=row["id"], reason="same_answer_new_question")
         if not existing:
             return DedupDecision(action="new", reason="empty_catalog")
 
-        candidate_text = f'{candidate["category"]}\n{candidate["question"]}\n{candidate["answer"]}'
-        texts = [candidate_text] + [f'{row["category"]}\n{row["questions"]}\n{row["answer"]}' for row in existing]
-        vectors = await self._encode(texts)
-        ranked = sorted(
-            ((row, _cosine(vectors[0], vector)) for row, vector in zip(existing, vectors[1:], strict=True)),
-            key=lambda pair: pair[1], reverse=True,
-        )[:5]
+        candidate_vector = (await self._encode([candidate_text]))[0]
+        heap = []
+        for offset in range(0, len(existing), 64):
+            page = existing[offset:offset + 64]
+            texts = [f'{row["category"]}\n{row["questions"]}\n{row["answer"]}' for row in page]
+            vectors = await self._encode(texts)
+            for row, vector in zip(page, vectors, strict=True):
+                item = (_cosine(candidate_vector, vector), row["id"], row)
+                if len(heap) < 5:
+                    heapq.heappush(heap, item)
+                elif item[:2] > heap[0][:2]:
+                    heapq.heapreplace(heap, item)
+        ranked = [(row, score) for score, _, row in sorted(heap, reverse=True)]
         candidates = [{**row, "similarity": score} for row, score in ranked]
         prompt = json.dumps({"candidate": candidate, "top5": candidates}, ensure_ascii=False, separators=(",", ":"))
         system = (

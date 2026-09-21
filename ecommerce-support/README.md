@@ -106,6 +106,8 @@ data: {"finish_reason":"stop"}
 
 建库先写 MySQL `pending`，再 upsert Milvus 并回填 `done`；中断后运行 `resume` 补齐。重复导入按来源主键幂等。删除 Markdown 后重新执行 `import-dir` 会删除该来源的 MySQL chunk，并在 resume 中清理对应向量；不会清空 `qa_extraction_staging`。本机只运行数据库和任务进程，BGE-M3 推理由硅基流动云端完成，本机不加载嵌入模型。
 
+历史会话挖掘会从模型上下文窗口中扣除结构化输出、margin 和 Prompt/Schema 预算，只提交完整轮次；不可拆的超限轮次会记录为 skipped，同会话其他短轮次继续处理。每个模型批次成功后立即事务提交 checkpoint；使用相同 `run-id` 重跑会复用首次扫描快照并跳过已提交批次，运行期间新增的消息留到下一次任务处理。
+
 阈值来自 `evals/ch03/calibration.jsonl`，当前值记录在 `.env.example`；知识内容、嵌入模型或拼接协议变化后必须重新校准。统一验收命令：
 
 ```bash

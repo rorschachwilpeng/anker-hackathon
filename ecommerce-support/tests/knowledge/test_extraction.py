@@ -30,6 +30,50 @@ def test_valid_evidence_is_accepted():
     assert validate_evidence(valid_item(), valid_messages()) is True
 
 
+def test_mock_tool_in_same_turn_cannot_be_hidden_by_omitting_tool_evidence():
+    from app.knowledge.extraction import validate_evidence
+
+    records = conversation(
+        {"id": 10, "role": "user", "content": "还有多少库存？", "tool_calls": None},
+        {"id": 11, "role": "assistant", "content": None, "tool_calls": [{"id": "call-1"}]},
+        {"id": 12, "role": "tool", "content": '{"source":"mock","stock":52}', "tool_call_id": "call-1", "tool_calls": None},
+        {"id": 13, "role": "assistant", "content": "还有52件库存。", "tool_calls": None},
+    )
+    item = valid_item(
+        question="还有多少库存？",
+        answer="还有52件库存。",
+        evidence_message_ids=[10, 13],
+    )
+
+    assert validate_evidence(item, records) is False
+
+
+def test_question_and_answer_must_come_from_the_same_turn():
+    from app.knowledge.extraction import validate_evidence
+
+    records = conversation(
+        {"id": 10, "role": "user", "content": "退货政策是什么？", "tool_calls": None},
+        {"id": 11, "role": "assistant", "content": "请补充商品状态。", "tool_calls": None},
+        {"id": 12, "role": "user", "content": "商品未拆封。", "tool_calls": None},
+        {"id": 13, "role": "assistant", "content": "签收后七天内可以申请退货。", "tool_calls": None},
+    )
+
+    assert validate_evidence(valid_item(evidence_message_ids=[10, 13]), records) is False
+
+
+def test_structured_failed_tool_result_is_rejected_even_when_final_answer_sounds_normal():
+    from app.knowledge.extraction import validate_evidence
+
+    records = conversation(
+        {"id": 10, "role": "user", "content": "退货政策是什么？", "tool_calls": None},
+        {"id": 11, "role": "assistant", "content": None, "tool_calls": [{"id": "call-1"}]},
+        {"id": 12, "role": "tool", "content": '{"ok":false,"error":{"message":"工具暂时不可用，未能确认结果；请稍后查询"}}', "tool_call_id": "call-1", "tool_calls": None},
+        {"id": 13, "role": "assistant", "content": "签收后七天内可以申请退货。", "tool_calls": None},
+    )
+
+    assert validate_evidence(valid_item(evidence_message_ids=[10, 13]), records) is False
+
+
 @pytest.mark.parametrize(
     ("item", "records"),
     [

@@ -22,11 +22,20 @@ from app.knowledge.dedup import Deduplicator, DedupService
 from app.knowledge.mining import MiningService
 from app.knowledge.worker import run_worker
 from app.knowledge.types import KnowledgeError
+from app.knowledge.prompts import render_qa_extraction_prompt
+from app.knowledge.extraction import ExtractionBatch
 
 
 def embedding_fingerprint(settings):
     raw=f'{settings.embedding_base_url.rstrip("/")}|{settings.embedding_model}|1024|text-v1'
     return hashlib.sha256(raw.encode()).hexdigest()
+
+def mining_byte_budget(settings):
+    prompt_bytes=len(render_qa_extraction_prompt(ExtractionBatch.model_json_schema()).encode())
+    available=(settings.context_window_tokens-settings.knowledge_extraction_max_tokens
+               -settings.context_margin_tokens-prompt_bytes-64)
+    if available<512:raise KnowledgeError('knowledge_extraction_context_too_small')
+    return available
 
 @asynccontextmanager
 async def runtime(settings=None,collection='knowledge',namespace='knowledge',failpoint=None):
@@ -59,7 +68,8 @@ async def execute(args):
                     max_tokens=service.embeddings.settings.knowledge_extraction_max_tokens,
                     timeout=service.embeddings.settings.request_timeout,max_retries=0)
                 dedup=DedupService(service.repo,Deduplicator(model,service.embeddings))
-                mining=MiningService(service.repo,QAExtractor(model),dedup_service=dedup,ingestion=service)
+                mining=MiningService(service.repo,QAExtractor(model),dedup_service=dedup,ingestion=service,
+                                     byte_budget=mining_byte_budget(service.embeddings.settings))
                 return await mining.run(args.run_id)
             return await service.resume()
 

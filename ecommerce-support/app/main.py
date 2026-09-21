@@ -67,10 +67,12 @@ def create_app(
                 ).hexdigest()
                 state = StateStore(database, namespace='knowledge')
                 knowledge_repo = KnowledgeRepository(database.sessions, state=state, fingerprint=fingerprint)
+                vectors = MilvusVectors(milvus, 'knowledge')
+                await vectors.ensure_collection()
                 knowledge_search = KnowledgeSearch(
                     knowledge_repo,
                     SiliconFlowEmbeddings(client, resolved_settings),
-                    MilvusVectors(milvus, 'knowledge'),
+                    vectors,
                     resolved_settings.knowledge_score_threshold,
                     resolved_settings.knowledge_top_k,
                 )

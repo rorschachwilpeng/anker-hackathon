@@ -15,7 +15,7 @@ from app.knowledge.extraction import QAExtractor
 from app.knowledge.mining import MiningService
 from app.knowledge.models import knowledge_chunks, knowledge_ingestion_state, qa_extraction_staging
 from app.models import conversations, messages
-from scripts.knowledge import runtime
+from scripts.knowledge import mining_byte_budget, runtime
 
 
 async def main():
@@ -47,7 +47,8 @@ async def main():
                 timeout=settings.request_timeout, max_retries=0,
             )
             dedup = DedupService(service.repo, Deduplicator(model, service.embeddings))
-            mining = MiningService(service.repo, QAExtractor(model), dedup_service=dedup, ingestion=service)
+            mining = MiningService(service.repo, QAExtractor(model), dedup_service=dedup, ingestion=service,
+                                   byte_budget=mining_byte_budget(settings))
             async with service.state.writer_lock():
                 await service.repo.ensure_config()
                 await service.vectors.ensure_collection()
