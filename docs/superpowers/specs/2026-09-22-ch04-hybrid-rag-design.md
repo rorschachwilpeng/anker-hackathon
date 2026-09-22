@@ -1,6 +1,6 @@
 # ch04 混合检索、重排与评估设计
 
-状态：对话设计方向已确认；本书面设计待用户审阅，尚未进入实施计划或产品代码实现。
+状态：用户以“执行”确认书面设计，进入实施计划编写；产品代码尚未开始。
 
 ## 目标与边界
 
@@ -12,7 +12,7 @@
 
 ## 索引与无损迁移
 
-现有 `knowledge` 集合只有 `id/vector/content_hash`，无法凭一次查询添加建集合时才定义的 BM25 函数。新建版本化集合 `knowledge_hybrid_v1`：`id` 为显式 INT64 主键，`vector` 为 1024 维 FLOAT_VECTOR（COSINE），`text` 为带内置 `chinese` analyzer 的 VARCHAR，`sparse` 为 SPARSE_FLOAT_VECTOR，另存 `category` 与 `content_hash` 供预过滤和 MySQL 原文校验。`text` 精确等于已有固定的 `category + questions + answer` 嵌入文本；只在该单份文本挂 Milvus BM25 函数，由服务端派生稀疏向量。章节路径、内容类型、关键条款和邻块指针只在 MySQL，不进 dense 文本以外的向量，也不作为重复记录存储。
+现有 `knowledge` 集合只有 `id/vector/content_hash`，无法凭一次查询添加建集合时才定义的 BM25 函数。新建版本化集合 `knowledge_hybrid_v1`：`id` 为显式 INT64 主键，`vector` 为 1024 维 FLOAT_VECTOR（COSINE），`text` 为带内置 `chinese` analyzer 的 VARCHAR，`sparse` 为 SPARSE_FLOAT_VECTOR，另存 `category` 与 `content_hash` 供预过滤和 MySQL 原文校验。Milvus VARCHAR 上限按 UTF-8 字节留足空间，不把 MySQL 的字符数误作字节数。`text` 精确等于已有固定的 `category + questions + answer` 嵌入文本；只在该单份文本挂 Milvus BM25 函数，由服务端派生稀疏向量。章节路径、内容类型、关键条款和邻块指针只在 MySQL，不进 dense 文本以外的向量，也不作为重复记录存储。
 
 通过独立迁移命令在已有知识 writer 锁下读取 MySQL 有效 chunk，先补齐 pending，再分批从旧集合按主键读取已验证的 BGE-M3 向量（缺失时重新编码），将同一主键、vector、text/category/hash 幂等写入新集合；重启后可继续，断点保存在现有 `knowledge_ingestion_state` 命名空间。保留旧集合及旧服务读取路径，直至新集合的条数、主键/hash、一条精确型号和中文问法的 BM25 检索及双路结果检查通过。切换在数据库状态记录里原子标记 active collection；新服务只在状态和新集合结构、索引均匹配时读取它，切换失败仍用旧集合。清理旧集合须另行显式操作，本章不自动删除。在线改写导入和定时 worker 与迁移共用锁，并在切换后向活动集合写入，避免旧 writer 写入一个在线不可见的集合。`knowledge_chunks.vectorize_status/vector_id` 的语义仍是当前活动集合对应主键，迁移中不提前标 done；旧集合继续提供服务。
 
@@ -38,7 +38,7 @@ System Prompt 列明不可承诺退款或到账时间、物流到达时间、赔
 
 从演示政策、售后手册和含相近型号的商品 FAQ 扩充**合成**标注集，分政策精确问法、型号字面词、口语同义词、多证据组合、无答案/对抗问法和元数据过滤等难度桶；每题固定 query、可接受 chunk ID 集、答案证据要点与是否应拒答，评估集不混入校准集。四策略在同一索引快照和相同每路 Top-50 / 输出 K 上运行：dense、BM25、hybrid RRF、hybrid + rerank。输出每桶和总体 Recall@K、MRR、无答案误命中率、延迟/失败数；生成段只以 hybrid + rerank 的最终证据生成，逐事实给忠实度裁判评 Faithfulness，同时记录拒答正确率、引用有效率及 `faith_cases` 新增/复发情况。报告保存原始逐题结果、评委模型/提示词、时间与知识版本，不只给汇总百分比。含明确型号的题须能看到 BM25 路的原始命中证据。
 
-聊天页按用户指定的 Vibe Coding 方式直接迭代，不套独立的 brainstorm/TDD/code review 门禁。回答 `[n]` 呈现为可点击引用，点开可看 MySQL 权威原文、章节路径和可用的来源定位；流式输出期间先显示文本，拿到完整引用映射后再变成安全 DOM 链接，不把模型输出当 HTML。每段回答左下角加 👍/👎，本地一次性点亮、显示“已反馈”并锁定；仅在浏览器当前会话采集，不提交后端，也不写低置信度池。UI 验收用实际浏览器手动演示点击、刷新与停止生成行为。
+聊天页按用户指定的 Vibe Coding 方式直接迭代，不套独立的 brainstorm/TDD/code review 门禁。回答 `[n]` 呈现为可点击引用，点开可看 MySQL 权威原文、章节路径和可用的来源定位；流式输出期间先显示文本，拿到完整引用映射后再变成安全 DOM 链接，不把模型输出当 HTML。完成帧附上已保存助手消息的 id 供前端本地反馈去重，不改变 `query_faq` 契约。每段回答左下角加 👍/👎，本地一次性点亮、显示“已反馈”并锁定；仅在浏览器当前会话采集，不提交后端，也不写低置信度池。UI 验收用实际浏览器手动演示点击、刷新与停止生成行为。
 
 ## 验收、回归和阶段记录
 
