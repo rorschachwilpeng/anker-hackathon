@@ -1,0 +1,9 @@
+[
+  {"id":"logistics","input":"订单 1001 的物流到哪了","tool":"query_logistics","args":{"order_id":"1001"},"mock":true,"followup":"我刚才问的是哪个订单号？只回答编号。","followup_contains":"1001"},
+  {"id":"faq-hit","input":"退货政策是什么","tool":"query_faq","args":{"keyword":"退货政策"},"found":true},
+  {"id":"faq-expected-miss","input":"邮费是多少","tool":"query_faq","args":{"keyword":"邮费"},"found":false},
+  {"id":"product","input":"请查询商品 P1001 的价格和库存","tool":"query_product","args":{"product_id":"P1001"},"mock":true},
+  {"id":"order","input":"请查询订单 1001 的订单金额","tool":"query_order","args":{"order_id":"1001"},"mock":true},
+  {"id":"ticket","input":"这是演示测试，请为我创建一张咨询类型的人工工单，问题是需要人工说明客服服务范围。","tool":"create_ticket"},
+  {"id":"greeting","input":"你好，请简单介绍自己。","tool":null}
+]

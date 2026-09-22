@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-09-21T03:50:18.476236+00:00",
+  "query": "邮费是多少",
+  "answer": "邮费政策是：订单实付满99元包邮，未满99元收取8元运费。偏远地区及大件商品不适用包邮，具体费用以结算页展示为准。",
+  "tool_statuses": [
+    {
+      "name": "query_faq",
+      "tool_call_id": "call_ysf2zunk2yf3duixpyrxd0mt",
+      "status": "running",
+      "attempt": 1
+    },
+    {
+      "name": "query_faq",
+      "tool_call_id": "call_ysf2zunk2yf3duixpyrxd0mt",
+      "status": "succeeded",
+      "attempt": 1
+    }
+  ],
+  "done": true,
+  "errors": [],
+  "passed": true
+}

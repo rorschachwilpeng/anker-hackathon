@@ -1,0 +1,12 @@
+{"case_id":"h01","query":"邮费是多少","expected":"未满99元收取8元运费"}
+{"case_id":"h02","query":"配送要另外付钱吗","expected":"订单实付满99元包邮"}
+{"case_id":"h03","query":"七天之后还可以无理由退吗","expected":"签收后7天内"}
+{"case_id":"h04","query":"拆开的贴身用品能退么","expected":"已拆封的贴身用品"}
+{"case_id":"h05","query":"发票的公司名称填错了怎么办","expected":"发票抬头一经开具"}
+{"case_id":"h06","query":"偏远地方送货需要多久","expected":"偏远地区"}
+{"case_id":"h07","query":"退回换货后什么时候重新发","expected":"仓库验收通过后安排换货"}
+{"case_id":"h08","query":"大额异常退款会怎么处理","expected":"创建人工工单"}
+{"case_id":"h09","query":"附近有什么好吃的","expected":null}
+{"case_id":"h10","query":"解释量子力学","expected":null}
+{"case_id":"h11","query":"推荐一部电影","expected":null}
+{"case_id":"h12","query":"人民币汇率是多少","expected":null}

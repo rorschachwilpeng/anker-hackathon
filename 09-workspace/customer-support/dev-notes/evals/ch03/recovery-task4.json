@@ -1,0 +1,15 @@
+{
+  "after-mysql": {
+    "crash_observed": true,
+    "pending_before_resume": 1,
+    "done_after_resume": true,
+    "matching_id_count": 1
+  },
+  "after-milvus": {
+    "crash_observed": true,
+    "pending_before_resume": 1,
+    "done_after_resume": true,
+    "matching_id_count": 1
+  },
+  "scope": "真实 MySQL + SiliconFlow BGE-M3 + 临时 Milvus 集合；测试数据已精确清理"
+}

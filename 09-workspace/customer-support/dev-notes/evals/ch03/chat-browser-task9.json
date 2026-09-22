@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-09-20T20:58:01+08:00",
+  "passed": true,
+  "checks": [
+    {"input": "邮费是多少", "tool_badge": "查询常见问题 · 已完成", "evidence": "订单实付满99元包邮，未满99元收取8元运费；偏远地区及大件商品不适用包邮，具体以结算页为准。", "passed": true},
+    {"input": "那不满99元呢？", "evidence": "不满99元需收取8元运费，并保留例外说明。", "passed": true},
+    {"input": "订单1001物流到哪了？", "tool_badge": "查询物流 · 已完成", "passed": true},
+    {"input": "请为刚才的物流问题创建人工工单", "tool_badge": "创建人工工单 · 已完成", "passed": true}
+  ],
+  "artifacts": [
+    "dev-notes/evals/ch03/chat-browser-task9.png",
+    "dev-notes/evals/ch03/chat-browser-regression-task9.png",
+    "dev-notes/evals/ch03/chat-sse-task9.txt"
+  ]
+}

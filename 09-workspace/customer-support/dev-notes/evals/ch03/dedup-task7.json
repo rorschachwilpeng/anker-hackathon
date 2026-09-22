@@ -1,0 +1,71 @@
+{
+  "total": 8,
+  "passed": 8,
+  "incorrect_merges": 0,
+  "results": [
+    {
+      "case": "same_shipping",
+      "expected": "merge",
+      "actual": "merge",
+      "target_id": 1,
+      "reason": "同一事实，不同问法，合并到已有知识。",
+      "passed": true
+    },
+    {
+      "case": "same_return",
+      "expected": "merge",
+      "actual": "merge",
+      "target_id": 2,
+      "reason": "候选与现有知识均表述收货/签收后7天内可退货，事实相同，仅问法不同。",
+      "passed": true
+    },
+    {
+      "case": "same_invoice",
+      "expected": "merge",
+      "actual": "merge",
+      "target_id": 3,
+      "reason": "候选与已有知识均表达订单完成后从订单详情获取电子发票，属于同一事实，仅问法不同。",
+      "passed": true
+    },
+    {
+      "case": "same_warranty",
+      "expected": "merge",
+      "actual": "merge",
+      "target_id": 4,
+      "reason": "候选与已有知识均表达保修期从商品签收之日起计算，事实相同，问法略有不同，应合并。",
+      "passed": true
+    },
+    {
+      "case": "conflict_return_days",
+      "expected": "review",
+      "actual": "review",
+      "target_id": null,
+      "reason": "退货期限冲突：候选答案称收货后15天内可退货，已有答案称签收后7天内可退货，需核实。",
+      "passed": true
+    },
+    {
+      "case": "conflict_invoice_type",
+      "expected": "review",
+      "actual": "review",
+      "target_id": 6,
+      "reason": "候选答案与已有知识冲突：候选称仅支持电子发票，而已有知识称支持纸质发票和电子发票。",
+      "passed": true
+    },
+    {
+      "case": "number_difference",
+      "expected": "review",
+      "actual": "review",
+      "target_id": null,
+      "reason": "免邮金额冲突：候选答案为满199元免邮，已有知识为满99元免邮，需核实。",
+      "passed": true
+    },
+    {
+      "case": "negation_difference",
+      "expected": "review",
+      "actual": "review",
+      "target_id": null,
+      "reason": "候选答案与已有知识在特价商品退货规则上直接冲突：候选称可退，已有答案称不可退，需人工核实。",
+      "passed": true
+    }
+  ]
+}

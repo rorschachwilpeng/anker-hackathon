@@ -1,0 +1,160 @@
+{
+  "timestamp": "2026-09-20T09:40:18.555357+00:00",
+  "model": "BAAI/bge-m3",
+  "config_fingerprint": "e72eda745ab5df2e6af53fcdf9630a4c148a289d11fbab5ccaff1ef0c4d3c948",
+  "threshold": 0.5703911052474976,
+  "top_k": 5,
+  "passed": true,
+  "cases": [
+    {
+      "case_id": "h01",
+      "query": "邮费是多少",
+      "expected": "未满99元收取8元运费",
+      "actual_source_ids": [
+        124
+      ],
+      "expected_source_id": 124,
+      "evidence": "订单实付满99元包邮，未满99元收取8元运费。偏远地区及大件商品不适用包邮，具体费用以结算页展示为准。",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h02",
+      "query": "配送要另外付钱吗",
+      "expected": "订单实付满99元包邮",
+      "actual_source_ids": [
+        124,
+        126,
+        130
+      ],
+      "expected_source_id": 124,
+      "evidence": "订单实付满99元包邮，未满99元收取8元运费。偏远地区及大件商品不适用包邮，具体费用以结算页展示为准。",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h03",
+      "query": "七天之后还可以无理由退吗",
+      "expected": "签收后7天内",
+      "actual_source_ids": [
+        125,
+        120,
+        129,
+        121,
+        130
+      ],
+      "expected_source_id": 125,
+      "evidence": "商品签收后7天内且商品完好可申请退货。定制商品、已拆封的贴身用品不支持无理由退货；质量问题不受该例外限制。",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h04",
+      "query": "拆开的贴身用品能退么",
+      "expected": "已拆封的贴身用品",
+      "actual_source_ids": [
+        125,
+        120
+      ],
+      "expected_source_id": 125,
+      "evidence": "商品签收后7天内且商品完好可申请退货。定制商品、已拆封的贴身用品不支持无理由退货；质量问题不受该例外限制。",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h05",
+      "query": "发票的公司名称填错了怎么办",
+      "expected": "发票抬头一经开具",
+      "actual_source_ids": [
+        126
+      ],
+      "expected_source_id": 126,
+      "evidence": "订单完成后可在订单详情页下载电子发票。发票抬头一经开具不得在线修改，需要联系客服处理。",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h06",
+      "query": "偏远地方送货需要多久",
+      "expected": "偏远地区",
+      "actual_source_ids": [
+        130
+      ],
+      "expected_source_id": 130,
+      "evidence": "| 区域 | 预计时效 | 说明 |\n| --- | --- | --- |\n| 江浙沪 | 1至2天 | 节假日可能延迟 |\n| 其他省市 | 3至5天 | 偏远地区除外 |\n| 偏远地区 | 5至10天 | 以物流实际线路为准 |",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h07",
+      "query": "退回换货后什么时候重新发",
+      "expected": "仓库验收通过后安排换货",
+      "actual_source_ids": [
+        125,
+        121,
+        129,
+        120,
+        130
+      ],
+      "expected_source_id": 121,
+      "evidence": "换货申请审核通过后，用户按页面地址寄回商品；仓库验收通过后安排换货。库存不足时应提供退款或等待补货的选择。",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h08",
+      "query": "大额异常退款会怎么处理",
+      "expected": "创建人工工单",
+      "actual_source_ids": [
+        122,
+        120,
+        121,
+        125
+      ],
+      "expected_source_id": 122,
+      "evidence": "涉及人身安全、疑似欺诈或大额异常退款时，应创建人工工单，不得仅凭自动回复作出处理结论。",
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h09",
+      "query": "附近有什么好吃的",
+      "expected": null,
+      "actual_source_ids": [],
+      "expected_source_id": null,
+      "evidence": null,
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h10",
+      "query": "解释量子力学",
+      "expected": null,
+      "actual_source_ids": [],
+      "expected_source_id": null,
+      "evidence": null,
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h11",
+      "query": "推荐一部电影",
+      "expected": null,
+      "actual_source_ids": [],
+      "expected_source_id": null,
+      "evidence": null,
+      "http_status": 200,
+      "passed": true
+    },
+    {
+      "case_id": "h12",
+      "query": "人民币汇率是多少",
+      "expected": null,
+      "actual_source_ids": [],
+      "expected_source_id": null,
+      "evidence": null,
+      "http_status": 200,
+      "passed": true
+    }
+  ]
+}

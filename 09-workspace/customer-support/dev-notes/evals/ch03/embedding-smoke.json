@@ -1,0 +1,9 @@
+{
+  "provider": "SiliconFlow",
+  "model": "BAAI/bge-m3",
+  "http_status": 200,
+  "dimensions": 1024,
+  "input": "邮费是多少？",
+  "usage": {"prompt_tokens": 8, "completion_tokens": 0, "total_tokens": 8},
+  "scope": "new embedding adapter smoke test; not retrieval acceptance"
+}
