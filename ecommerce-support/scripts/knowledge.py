@@ -56,10 +56,19 @@ async def runtime(settings=None,collection='knowledge',namespace='knowledge',fai
             await client.close()
             await db.close()
 
+async def select_writer_vectors(service):
+    # Must be called while holding the same writer lock as activation.
+    if service.state.namespace != 'knowledge':
+        return
+    name=await active_collection(service.state)
+    client=service.vectors.client
+    service.vectors=HybridVectors(client,name) if name=='knowledge_hybrid_v1' else MilvusVectors(client,name)
+
 async def execute(args):
     async with runtime(failpoint=args.failpoint) as service:
         if args.command=='status':return await service.repo.status()
         async with service.state.writer_lock():
+            await select_writer_vectors(service)
             await service.repo.ensure_config(rebuild=args.command=='reembed-all')
             await service.vectors.ensure_collection()
             if args.command=='import-dir':return await service.import_directory(args.path)

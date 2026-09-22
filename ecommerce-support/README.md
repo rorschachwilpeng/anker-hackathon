@@ -146,3 +146,5 @@ HTTP 校验 422、预算超限 413、会话缺失 404、同会话繁忙 409、�
 # ch04 混合检索评估
 
 先运行 `.venv/bin/python scripts/evaluate_ch04.py --validate-dataset --dataset evals/ch04/holdout.jsonl` 核验合成标注对应的演示文档，无外部请求。新 `knowledge_hybrid_v1` 完成迁移并激活、且演示文档（含型号 FAQ）重新入库后，运行 `.venv/bin/python scripts/evaluate_ch04.py --dataset evals/ch04/holdout.jsonl --output ../dev-notes/evals/ch04/report.json`。真实评估会把检索证据发给配置的云端重排/生成/裁判模型，并把被判编造的个案写入 `faith_cases`；仅在明确授权现有资料向该外部服务发送后运行。报告包含四策略按桶 Recall@1/5/10、MRR、无答案误命中率，以及混合重排的生成忠实度、逐题证据与错误。
+
+激活前先用 `.venv/bin/python scripts/evaluate_ch04.py --dataset evals/ch04/calibration.jsonl --calibrate-threshold --output ../dev-notes/evals/ch04/calibration.json` 从已准备的集合得到建议精排阈值；人工检查标注与正负样本后在 `.env` 中填写 `RERANK_SCORE_THRESHOLD`，再执行迁移的 `verify`/`activate`。激活会核验 MySQL 全量主键/hash 和 Milvus 活跃行总量，并对中文问题、带型号问题逐一检查 dense、BM25、RRF 三路可见性。旧集合与数据保留；未配置阈值或新集合不可用时，应用拒绝以看似正常的健康状态启动。

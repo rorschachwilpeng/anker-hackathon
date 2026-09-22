@@ -31,11 +31,15 @@ async def _all_rows(repo):
 
 async def _verify(repo, new_vectors):
     count = 0
+    examples=[]
     async for row in _all_rows(repo):
         if not await new_vectors.verify([(row.id,row.content_hash)]):
             return MigrationReport(False,count)
+        examples.append(row)
         count += 1
-    return MigrationReport(True,count)
+    if await new_vectors.count_live() != count:
+        return MigrationReport(False,count)
+    return MigrationReport(await new_vectors.probe(examples),count)
 
 
 async def migrate_hybrid(repo, old_vectors, new_vectors, state, embeddings, failpoint=None):

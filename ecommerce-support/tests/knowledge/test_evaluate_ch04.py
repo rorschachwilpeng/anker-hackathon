@@ -22,6 +22,13 @@ def test_metrics_two_gold_and_no_answer():
     assert mrr(set(),[1])==0
 
 
+def test_calibration_picks_threshold_separating_answerable_and_unknown():
+    from app.knowledge.evaluation import recommend_threshold
+    samples=[(.87,True),(.75,True),(.31,False),(.42,False)]
+    threshold=recommend_threshold(samples)
+    assert .42 < threshold <= .75
+
+
 async def test_four_strategies_and_all_evidence_snapshot():
     from app.knowledge.evaluation import evaluate_cases
     from app.knowledge.text import content_hash
@@ -46,3 +53,5 @@ async def test_four_strategies_and_all_evidence_snapshot():
     assert report['strategies']['hybrid']['overall']['recall@5']==1.
     assert len(pool.cases)==1 and len(pool.cases[0]['citations'])==2
     assert report['strategies']['hybrid_rerank']['cases'][0]['faithfulness']['faithful'] is False
+    assert report['strategies']['hybrid_rerank']['overall']['citation_valid_rate']==1
+    assert report['metadata']['judge_model'] is None

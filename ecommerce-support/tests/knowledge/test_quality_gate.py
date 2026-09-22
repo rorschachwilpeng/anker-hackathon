@@ -74,6 +74,27 @@ async def test_unclosed_citation_is_not_streamed_or_saved():
     assert '不足以确认' in repo.rows[-1]['content']
 
 
+async def test_length_answer_with_evidence_resets_partial_policy_claim():
+    from app.chat_service import ChatService
+    repo=MemoryRepository()
+    model=FakeModel([[faq_call()],[AIMessageChunk(content='肯定明天到账',response_metadata={'finish_reason':'length'})]])
+    service=ChatService(config(),model,repo,Search(),quality_gate=Gate(True),quality_repo=LowPool())
+    events=[e async for e in service.stream(await service.prepare('邮费是多少',None))]
+    assert any(e.event=='answer_reset' for e in events)
+    assert events[-1].data['finish_reason']=='stop'
+    assert '不足以确认' in repo.rows[-1]['content']
+
+
+async def test_no_tool_policy_claim_is_replaced_when_hybrid_gate_enabled():
+    from app.chat_service import ChatService
+    repo=MemoryRepository()
+    model=FakeModel([[AIMessageChunk(content='退款明天一定到账。',response_metadata={'finish_reason':'stop'})]])
+    service=ChatService(config(),model,repo,Search(),quality_gate=Gate(True),quality_repo=LowPool())
+    events=[e async for e in service.stream(await service.prepare('退款多久到账',None))]
+    assert any(e.event=='answer_reset' for e in events)
+    assert '明天' not in repo.rows[-1]['content']
+
+
 async def test_self_check_invalid_schema_is_error_not_useful():
     from app.knowledge.quality import EvidenceGate
     class Model:

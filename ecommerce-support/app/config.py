@@ -39,6 +39,16 @@ class Settings(BaseSettings):
         if search and self.knowledge_score_threshold is None:
             raise ValueError('knowledge score threshold requires calibration')
 
+    def ensure_hybrid_ready(self) -> None:
+        self.ensure_knowledge_ready(search=False)
+        if self.rerank_score_threshold is None:
+            raise ValueError('rerank score threshold requires calibration')
+        key=self.rerank_api_key or self.embedding_api_key
+        if key is None or not key.get_secret_value().strip():
+            raise ValueError('rerank API key required')
+        if self.rerank_base_url.rstrip('/') != 'https://api.siliconflow.cn/v1':
+            raise ValueError('rerank endpoint must be SiliconFlow')
+
     database_url: SecretStr | None = None
     tool_timeout: float = Field(default=5.0, gt=0, le=30)
 

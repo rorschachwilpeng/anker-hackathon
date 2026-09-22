@@ -30,13 +30,14 @@ class QualityRepository:
             raise ValueError('incomplete faith case')
         async with self.sessions.begin() as session:
             stmt = mysql_insert(faith_cases).values(**{k:case[k] for k in fields})
-            await session.execute(stmt.on_duplicate_key_update(
+            result=await session.execute(stmt.on_duplicate_key_update(
                 bucket=stmt.inserted.bucket, query=stmt.inserted.query,
                 strategy=stmt.inserted.strategy, answer=stmt.inserted.answer,
                 reason=stmt.inserted.reason, citations=stmt.inserted.citations,
                 judge_model=stmt.inserted.judge_model, status='未解决', resolution=None,
                 seen_count=faith_cases.c.seen_count+1,
                 last_seen_at=func.current_timestamp()))
+            return 'new' if result.rowcount == 1 else 'recurrent'
 
     async def resolve(self, eval_id, status, resolution):
         if status not in ('已解决','无需解决') or not resolution.strip() or len(resolution)>300:

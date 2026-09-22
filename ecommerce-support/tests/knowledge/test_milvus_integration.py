@@ -13,9 +13,14 @@ async def test_real_milvus_chinese_bm25_and_hybrid():
         row = ChunkSnapshot(1001,ChunkDraft('商品','X100-Pro 的质保期','X100-Pro 支持两年质保。'),'a'*64)
         vector = [1.0]+[0.0]*1023
         assert await adapter.upsert([(row,vector)]) == [1001]
+        assert await adapter.count_live() == 1
+        await adapter.upsert([(row,vector)])
+        assert await adapter.count_live() == 1
         assert [h.id for h in await adapter.retrieve('X100-Pro 质保','X100-Pro 质保',vector,'商品','bm25')] == [1001]
         assert [h.id for h in await adapter.retrieve('X100-Pro 质保','X100-Pro 质保',vector,'商品','hybrid')] == [1001]
+        assert await adapter.probe([row])
         await adapter.delete([1001])
+        assert await adapter.count_live() == 0
         assert await adapter.retrieve('X100-Pro','X100-Pro',vector,'商品','bm25') == []
     finally:
         if await client.has_collection(name,timeout=5):

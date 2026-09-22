@@ -36,6 +36,7 @@ async def run(command, failpoint=None):
         old = MilvusVectors(client,'knowledge')
         new = HybridVectors(client,'knowledge_hybrid_v1')
         async with state.writer_lock():
+            active = await active_collection(state)
             if command == 'prepare':
                 if active != 'knowledge':
                     raise RuntimeError('hybrid collection already active')
@@ -46,6 +47,8 @@ async def run(command, failpoint=None):
                     await IngestionService(repo,embeddings,old,state).resume()
                     report = await migrate_hybrid(repo,old,new,state,embeddings,failpoint)
             else:
+                if command == 'activate':
+                    settings.ensure_hybrid_ready()
                 if not await client.has_collection(new.collection,timeout=10):
                     raise RuntimeError('prepare hybrid index first')
                 await new.ensure_collection()

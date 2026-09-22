@@ -16,9 +16,9 @@ async def test_record_faith_case_reopens_resolved():
     ident = 'T' + uuid.uuid4().hex[:15]
     case = dict(eval_id=ident, bucket='B_model', query='X100 型号?', strategy='hybrid_rerank', answer='答一', reason='无证据', citations=[{'n':1,'chunk_id':4,'section_path':'商品','question':'型号','answer':'原文'}], judge_model='judge')
     try:
-        await repo.record_faith_case(case)
+        assert await repo.record_faith_case(case) == 'new'
         await repo.resolve(ident,'已解决','已补充型号原文')
-        await repo.record_faith_case({**case,'answer':'答二'})
+        assert await repo.record_faith_case({**case,'answer':'答二'}) == 'recurrent'
         async with db.sessions() as s:
             row=(await s.execute(text('SELECT answer,status,seen_count,resolution,resolved_at,citations FROM faith_cases WHERE eval_id=:id'),{'id':ident})).mappings().one()
             assert (row['answer'],row['status'],row['seen_count'],row['resolution']) == ('答二','未解决',2,None)

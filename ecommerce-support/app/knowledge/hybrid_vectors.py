@@ -141,3 +141,28 @@ class HybridVectors:
                                          output_fields=['id','content_hash'], timeout=15)
         return ({r['id']:r['content_hash'] for r in actual} == dict(rows)
                 and len(actual) == len(rows))
+
+    async def count_live(self):
+        rows=await self.client.query(self.collection,filter='id >= 0',
+                                     output_fields=['count(*)'],timeout=15)
+        if len(rows)!=1 or type(rows[0].get('count(*)')) is not int:
+            raise VectorError('hybrid_count_invalid')
+        return rows[0]['count(*)']
+
+    async def probe(self, rows):
+        # A real indexed model token and a Chinese knowledge question must both be searchable.
+        model_row=next((row for row in rows if re.search(r'[A-Za-z]+\d+[\w-]*',row.draft.questions)),None)
+        chinese_row=next((row for row in rows if re.search(r'[\u4e00-\u9fff]{2}',row.draft.questions)),None)
+        if model_row is None or chinese_row is None:
+            return False
+        for row in (model_row,chinese_row):
+            actual=await self.client.query(self.collection,ids=[row.id],output_fields=['vector'],timeout=15)
+            if len(actual)!=1 or not valid_vector(actual[0].get('vector')):
+                return False
+            vector=actual[0]['vector']
+            for strategy in ('dense','bm25','hybrid'):
+                hits=await self.retrieve(row.draft.questions,row.draft.questions,vector,
+                                         row.draft.category,strategy,limit=50)
+                if row.id not in [hit.id for hit in hits]:
+                    return False
+        return True

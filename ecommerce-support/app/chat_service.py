@@ -108,6 +108,8 @@ class ChatService:
                     content=json.dumps(result,ensure_ascii=False)
                     await self.repo.append_message(cid,'tool',content,tool_call_id=call['id'])
                     current.append(ToolMessage(content=content,tool_call_id=call['id']))
+                    if index==0 and call['name']=='query_faq' and self.quality_gate is not None and not result.get('ok'):
+                        refused=True
                     if (index==0 and call['name']=='query_faq' and result.get('ok')
                             and self.quality_gate is not None):
                         ids=[i['id'] for i in result['data']['items']]
@@ -168,12 +170,18 @@ class ChatService:
                                     yield StreamEvent('token',{'text':chunk.text})
                             reason=chunk.response_metadata.get('finish_reason') or reason
                     finally:await upstream.aclose()
-                    if citation_map and reason=='stop':
+                    if citation_map:
                         cited=[int(n) for n in re.findall(r'\[(\d+)\]',answer)]
-                        if pending or invalid_citation or not cited or any(n not in citation_map for n in cited):
+                        if reason!='stop' or pending or invalid_citation or not cited or any(n not in citation_map for n in cited):
                             yield StreamEvent('answer_reset',{})
                             answer=REFUSAL
+                            reason='stop'
                             yield StreamEvent('token',{'text':answer})
+            elif self.quality_gate is not None:
+                if answer:yield StreamEvent('answer_reset',{})
+                answer='请告诉我需要核实的订单、商品或售后问题，我会根据可查到的资料答复。'
+                reason='stop'
+                yield StreamEvent('token',{'text':answer})
             if not answer.strip() or reason not in ('stop','length'):raise ChatProtocolError('unfinished response')
             message_id=await self.repo.append_message(cid,'assistant',answer) if reason=='stop' else None
             yield StreamEvent('done',{'finish_reason':reason,**({'message_id':message_id} if message_id else {})})

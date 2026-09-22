@@ -46,6 +46,12 @@ class FakeNew:
     async def verify(self, rows):
         return all(i in self.rows and self.rows[i][0].content_hash == digest for i,digest in rows)
 
+    async def count_live(self):
+        return len(self.rows)
+
+    async def probe(self, rows):
+        return True
+
 
 class FakeState:
     def __init__(self):
@@ -87,4 +93,24 @@ async def test_missing_old_vector_is_reembedded_and_invalid_hash_blocks_activati
     assert state.values['active_collection']['name'] == 'knowledge_hybrid_v1'
     new.rows[19] = (ChunkSnapshot(19,repo.row.draft,'b'*64),[1.0]*1024)
     with pytest.raises(KnowledgeError, match='verification'):
+        await activate_hybrid(repo,new,state)
+
+
+async def test_stale_vector_left_after_source_deleted_blocks_activation():
+    from app.knowledge.migration import activate_hybrid
+    repo,new,state=FakeRepo(),FakeNew(),FakeState()
+    new.rows[19]=(repo.row,[1.0]*1024)
+    extra=ChunkSnapshot(20,repo.row.draft,'b'*64)
+    new.rows[20]=(extra,[1.0]*1024)
+    with pytest.raises(KnowledgeError,match='verification'):
+        await activate_hybrid(repo,new,state)
+
+
+async def test_failed_bm25_probe_blocks_activation():
+    from app.knowledge.migration import activate_hybrid
+    repo,new,state=FakeRepo(),FakeNew(),FakeState()
+    new.rows[19]=(repo.row,[1.0]*1024)
+    async def broken_probe(rows):return False
+    new.probe=broken_probe
+    with pytest.raises(KnowledgeError,match='verification'):
         await activate_hybrid(repo,new,state)

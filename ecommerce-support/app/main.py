@@ -77,6 +77,8 @@ def create_app(
                 from app.knowledge.hybrid_vectors import HybridVectors
                 from app.knowledge.migration import active_collection
                 collection = await active_collection(state)
+                if collection == 'knowledge_hybrid_v1':
+                    resolved_settings.ensure_hybrid_ready()
                 vectors = HybridVectors(milvus, collection) if collection == 'knowledge_hybrid_v1' else MilvusVectors(milvus, collection)
                 await vectors.ensure_collection()
                 embeddings = SiliconFlowEmbeddings(client, resolved_settings)
@@ -90,10 +92,13 @@ def create_app(
                 else:
                     knowledge_search = KnowledgeSearch(knowledge_repo, embeddings, vectors,
                         resolved_settings.knowledge_score_threshold, resolved_settings.knowledge_top_k)
-            except Exception:
+            except Exception as exc:
                 if milvus is not None:
                     await milvus.close()
                     milvus = None
+                if collection == 'knowledge_hybrid_v1':
+                    await database.close()
+                    raise RuntimeError('active hybrid knowledge unavailable; startup stopped') from exc
             application.state.chat_service = chat_service or ChatService(
                 resolved_settings, application.state.service.model, Repository(database.sessions), knowledge_search,
                 quality_gate=(EvidenceGate(application.state.service.model,resolved_settings.structured_output_method)
