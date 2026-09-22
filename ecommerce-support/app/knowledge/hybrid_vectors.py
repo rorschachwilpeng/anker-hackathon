@@ -128,3 +128,16 @@ class HybridVectors:
     async def delete(self, ids):
         if ids:
             await self.client.delete(self.collection, ids=ids, timeout=15)
+
+    async def search(self, vector, top_k):
+        # Compatibility for the ch03 dense-only callers until the online hybrid path is activated.
+        return await self.retrieve('dense', 'dense', vector, strategy='dense', limit=top_k)
+
+    async def verify(self, rows):
+        if not rows:
+            return True
+        ids = [ident for ident,_ in rows]
+        actual = await self.client.query(self.collection, ids=ids,
+                                         output_fields=['id','content_hash'], timeout=15)
+        return ({r['id']:r['content_hash'] for r in actual} == dict(rows)
+                and len(actual) == len(rows))

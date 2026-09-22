@@ -138,6 +138,13 @@ class KnowledgeRepository:
             rows=(await s.execute(select(chunks).where(chunks.c.id.in_(ids),chunks.c.vectorize_status=='done'))).mappings().all()
             return {r['id']:snapshot(r) for r in rows if r['vector_id']==str(r['id'])}
 
+    async def all_done_after(self,last_id,limit=32):
+        async with self.sessions() as s:
+            if not await self.config_matches(s):raise KnowledgeError('embedding_config_changed')
+            rows=(await s.execute(select(chunks).where(chunks.c.id>last_id,
+                chunks.c.vectorize_status=='done').order_by(chunks.c.id).limit(limit))).mappings().all()
+            return [snapshot(r) for r in rows if r['vector_id']==str(r['id'])]
+
     async def tombstones(self):
         return [i for _,p in await self.state.entries('source:') for i in p.get('deleted_ids',[])]
 

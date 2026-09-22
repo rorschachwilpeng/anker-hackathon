@@ -67,7 +67,10 @@ def create_app(
                 ).hexdigest()
                 state = StateStore(database, namespace='knowledge')
                 knowledge_repo = KnowledgeRepository(database.sessions, state=state, fingerprint=fingerprint)
-                vectors = MilvusVectors(milvus, 'knowledge')
+                from app.knowledge.hybrid_vectors import HybridVectors
+                from app.knowledge.migration import active_collection
+                collection = await active_collection(state)
+                vectors = HybridVectors(milvus, collection) if collection == 'knowledge_hybrid_v1' else MilvusVectors(milvus, collection)
                 await vectors.ensure_collection()
                 knowledge_search = KnowledgeSearch(
                     knowledge_repo,

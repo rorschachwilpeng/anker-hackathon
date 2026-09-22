@@ -14,6 +14,8 @@ from app.config import Settings
 from app.database import Database
 from app.knowledge.embeddings import SiliconFlowEmbeddings
 from app.knowledge.vectors import MilvusVectors
+from app.knowledge.hybrid_vectors import HybridVectors
+from app.knowledge.migration import active_collection
 from app.knowledge.state import StateStore
 from app.knowledge.repository import KnowledgeRepository
 from app.knowledge.ingestion import IngestionService, InjectedFailure
@@ -46,7 +48,8 @@ async def runtime(settings=None,collection='knowledge',namespace='knowledge',fai
     async with httpx.AsyncClient() as http:
         state=StateStore(db,namespace)
         repo=KnowledgeRepository(db.sessions,state=state,fingerprint=embedding_fingerprint(settings))
-        vectors=MilvusVectors(client,collection)
+        active=await active_collection(state) if collection=='knowledge' and namespace=='knowledge' else collection
+        vectors=HybridVectors(client,active) if active=='knowledge_hybrid_v1' else MilvusVectors(client,active)
         service=IngestionService(repo,SiliconFlowEmbeddings(http,settings),vectors,state,failpoint=failpoint)
         try:yield service
         finally:
