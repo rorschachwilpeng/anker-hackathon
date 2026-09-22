@@ -9,7 +9,7 @@ from app.events import StreamEvent
 from app.prompts import TOOL_CHAT_PROMPT
 from app.tools.business import ToolContext,build_tools
 from app.tools.executor import ToolExecutor,failure
-from app.knowledge.evidence import pack_evidence
+from app.knowledge.evidence import Evidence,pack_evidence
 from app.knowledge.reranker import RankedChunk
 from app.knowledge.quality import REFUSAL
 
@@ -126,6 +126,15 @@ class ChatService:
                             citation_map={e.n:e for e in evidence}
                             if not citation_map:
                                 raise ChatProtocolError('useful without evidence')
+                    elif (index==0 and call['name']=='query_faq' and result.get('ok')
+                            and self.knowledge_search is not None
+                            and getattr(self.knowledge_search,'repo',None) is not None):
+                        items=result['data']['items']
+                        rows=await self.knowledge_search.repo.load_done([item['id'] for item in items])
+                        citation_map={item['id']:Evidence(item['id'],item['id'],rows[item['id']].draft.section_path,
+                            rows[item['id']].draft.questions,rows[item['id']].draft.answer)
+                            for item in items if item['id'] in rows
+                            and rows[item['id']].draft.answer==item['answer']}
                 if refused:
                     answer=REFUSAL;reason='stop'
                     yield StreamEvent('token',{'text':answer})
@@ -172,7 +181,9 @@ class ChatService:
                     finally:await upstream.aclose()
                     if citation_map:
                         cited=[int(n) for n in re.findall(r'\[(\d+)\]',answer)]
-                        if reason!='stop' or pending or invalid_citation or not cited or any(n not in citation_map for n in cited):
+                        if ((self.quality_gate is not None and reason!='stop') or pending or invalid_citation
+                                or (self.quality_gate is not None and not cited)
+                                or any(n not in citation_map for n in cited)):
                             yield StreamEvent('answer_reset',{})
                             answer=REFUSAL
                             reason='stop'

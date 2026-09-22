@@ -94,3 +94,41 @@ async def test_final_request_explicitly_forbids_tools():
     svc=ChatService(Settings(openai_base_url='http://example.invalid',openai_model='fake',openai_api_key='fake'),model,MemoryRepository())
     [e async for e in svc.stream(await svc.prepare('退货政策',None))]
     assert model.requests[-1].get('tool_choice')=='none'
+
+
+async def test_dense_faq_legacy_chunk_ids_have_authoritative_citation_mapping():
+    from app.chat_service import ChatService
+    from app.config import Settings
+    from app.knowledge.types import ChunkDraft,ChunkSnapshot
+    class KnowledgeRepo:
+        async def load_done(self,ids):
+            return {125:ChunkSnapshot(125,ChunkDraft('退货','退货政策','签收7天内可申请退货。','政策/退货'),'a'*64)}
+    class Search:
+        repo=KnowledgeRepo()
+        async def find(self,keyword):
+            return [{'id':125,'question':'退货政策','answer':'签收7天内可申请退货。','category':'退货'}]
+    call=AIMessageChunk(content='',tool_call_chunks=[{'name':'query_faq','args':'{"keyword":"退货政策"}','id':'c','index':0}],response_metadata={'finish_reason':'tool_calls'})
+    model=FakeModel([[call],[AIMessageChunk(content='签收7天内可申请退货[125]。',response_metadata={'finish_reason':'stop'})]])
+    svc=ChatService(Settings(openai_base_url='http://example.invalid',openai_model='fake',openai_api_key='fake'),model,MemoryRepository(),Search())
+    events=[e async for e in svc.stream(await svc.prepare('退货政策是怎样的？',None))]
+    citations=[e.data['items'] for e in events if e.event=='citations']
+    assert citations==[[{'n':125,'chunk_id':125,'section_path':'政策/退货'}]]
+    assert events[-1].event=='done'
+
+
+async def test_dense_faq_without_citation_keeps_previous_answer_behavior():
+    from app.chat_service import ChatService
+    from app.config import Settings
+    from app.knowledge.types import ChunkDraft,ChunkSnapshot
+    class KnowledgeRepo:
+        async def load_done(self,ids):
+            return {7:ChunkSnapshot(7,ChunkDraft('配送','运费','满99元包邮。','政策/运费'),'a'*64)}
+    class Search:
+        repo=KnowledgeRepo()
+        async def find(self,keyword):return [{'id':7,'question':'运费','answer':'满99元包邮。','category':'配送'}]
+    call=AIMessageChunk(content='',tool_call_chunks=[{'name':'query_faq','args':'{"keyword":"邮费"}','id':'c','index':0}],response_metadata={'finish_reason':'tool_calls'})
+    repo=MemoryRepository()
+    svc=ChatService(Settings(openai_base_url='http://example.invalid',openai_model='fake',openai_api_key='fake'),
+                    FakeModel([[call],[AIMessageChunk(content='满99元包邮。',response_metadata={'finish_reason':'stop'})]]),repo,Search())
+    [e async for e in svc.stream(await svc.prepare('邮费是多少',None))]
+    assert repo.rows[-1]['content']=='满99元包邮。'
