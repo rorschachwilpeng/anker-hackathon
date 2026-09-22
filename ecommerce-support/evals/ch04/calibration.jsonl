@@ -1,0 +1,6 @@
+{"id":"A90","bucket":"A_policy","query":"免运费门槛是多少元？","gold_hashes":["7d1833ae3c1ddce032d1c17725fd38335630ee10de06d11f058b35a80cd29f5b"]}
+{"id":"B90","bucket":"B_model","query":"X100 标注的防溅级别是什么？","gold_hashes":["7bd0411b5afdbf9ca79c9d46d97c2647b13eb81e68c3efa1eac85e8a0b9f5cef"]}
+{"id":"C90","bucket":"C_colloquial","query":"箱子磕坏咋办","gold_hashes":["70332a55c5d73d2416a79ffb0d359e3adb11adac1b6591eb51c45049f93370dc"]}
+{"id":"E90","bucket":"E_multi","query":"怎么退货，还能下载发票吗？","gold_hashes":["ef457a0f0c0c4aeb961a8e6640f00f843f7ca54968c23c83771e0fa7499c5aab","877c96dde0857a074ba87b7cd0c7e48f765b338c22a1686928709273fcfe6412"]}
+{"id":"D90","bucket":"D_no_answer","query":"你们保证后天上午送到吗？","gold_hashes":[]}
+{"id":"F90","bucket":"F_category","query":"X200-Pro 无线充电","category":"虚构演示商品 FAQ / 型号配件","gold_hashes":["0dafbfc9a6289f63715c8c4e3735b98a2e1bef203b4a76c4fe0b1d675952aef0"]}

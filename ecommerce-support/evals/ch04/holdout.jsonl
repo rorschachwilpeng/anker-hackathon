@@ -1,0 +1,18 @@
+{"id":"A01","bucket":"A_policy","query":"邮费是多少？","gold_hashes":["7d1833ae3c1ddce032d1c17725fd38335630ee10de06d11f058b35a80cd29f5b"]}
+{"id":"A02","bucket":"A_policy","query":"签收几天内还能退货？","gold_hashes":["ef457a0f0c0c4aeb961a8e6640f00f843f7ca54968c23c83771e0fa7499c5aab"]}
+{"id":"A03","bucket":"A_policy","query":"发票抬头开错了怎么改？","gold_hashes":["877c96dde0857a074ba87b7cd0c7e48f765b338c22a1686928709273fcfe6412"]}
+{"id":"B01","bucket":"B_model","query":"X100-Pro 配 65W 还是 45W？","gold_hashes":["cfc63473f1f0ff80002aa36af362db0210e68a2506c0fcca3e1ca46f969b18e8"]}
+{"id":"B02","bucket":"B_model","query":"X200-Mini 有无线充电吗？不是 X200-Pro","gold_hashes":["0dafbfc9a6289f63715c8c4e3735b98a2e1bef203b4a76c4fe0b1d675952aef0"]}
+{"id":"B03","bucket":"B_model","query":"X100-Pro 的 IP54 能泡水吗？","gold_hashes":["7bd0411b5afdbf9ca79c9d46d97c2647b13eb81e68c3efa1eac85e8a0b9f5cef"]}
+{"id":"C01","bucket":"C_colloquial","query":"凑单没到一百是不是还要运费啊","gold_hashes":["7d1833ae3c1ddce032d1c17725fd38335630ee10de06d11f058b35a80cd29f5b"]}
+{"id":"C02","bucket":"C_colloquial","query":"快递箱子压烂了我该留啥","gold_hashes":["70332a55c5d73d2416a79ffb0d359e3adb11adac1b6591eb51c45049f93370dc"]}
+{"id":"C03","bucket":"C_colloquial","query":"买的东西断货了啥时候有","gold_hashes":["19d6323efc0913f4c89f037efd0b17811ac9463d28978dd3d3010c27a1714f94"]}
+{"id":"E01","bucket":"E_multi","query":"退货期限和邮费怎么算？","gold_hashes":["ef457a0f0c0c4aeb961a8e6640f00f843f7ca54968c23c83771e0fa7499c5aab","7d1833ae3c1ddce032d1c17725fd38335630ee10de06d11f058b35a80cd29f5b"]}
+{"id":"E02","bucket":"E_multi","query":"破损了先拍什么，换货后什么时候寄出？","gold_hashes":["70332a55c5d73d2416a79ffb0d359e3adb11adac1b6591eb51c45049f93370dc","7bc9879dc20950373957cf9cd3c39299e4f5ac1cf880287ed2a2ce4c4c59fb7f"]}
+{"id":"E03","bucket":"E_multi","query":"X100-Pro 防水吗，充电器多少瓦？","gold_hashes":["7bd0411b5afdbf9ca79c9d46d97c2647b13eb81e68c3efa1eac85e8a0b9f5cef","cfc63473f1f0ff80002aa36af362db0210e68a2506c0fcca3e1ca46f969b18e8"]}
+{"id":"D01","bucket":"D_no_answer","query":"客服能承诺明天必定到账吗？","gold_hashes":[]}
+{"id":"D02","bucket":"D_no_answer","query":"给我编一个不存在的商品优惠码","gold_hashes":[]}
+{"id":"D03","bucket":"D_no_answer","query":"X300-Ultra 的电池容量是多少？","gold_hashes":[]}
+{"id":"F01","bucket":"F_category","query":"X200-Mini 无线充电","category":"虚构演示商品 FAQ / 型号配件","gold_hashes":["0dafbfc9a6289f63715c8c4e3735b98a2e1bef203b4a76c4fe0b1d675952aef0"]}
+{"id":"F02","bucket":"F_category","query":"X100-Pro 配件瓦数","category":"虚构演示商品 FAQ / 型号配件","gold_hashes":["cfc63473f1f0ff80002aa36af362db0210e68a2506c0fcca3e1ca46f969b18e8"]}
+{"id":"F03","bucket":"F_category","query":"X100-Pro 防水","category":"虚构演示商品 FAQ / 型号配件","gold_hashes":["7bd0411b5afdbf9ca79c9d46d97c2647b13eb81e68c3efa1eac85e8a0b9f5cef"]}

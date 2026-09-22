@@ -143,3 +143,6 @@ HTTP 校验 422、预算超限 413、会话缺失 404、同会话繁忙 409、�
 - 模型须支持 OpenAI 兼容工具协议、流式输出和 JSON 模式；不兼容不会自动换模型。
 - 表结构没有消息完成状态字段，中断原因在运行日志，数据库不完整轮次通过消息结构识别。
 - 过程记录：仓库 `dev-notes/ch03.md`；设计与计划在 `docs/superpowers/`。
+# ch04 混合检索评估
+
+先运行 `.venv/bin/python scripts/evaluate_ch04.py --validate-dataset --dataset evals/ch04/holdout.jsonl` 核验合成标注对应的演示文档，无外部请求。新 `knowledge_hybrid_v1` 完成迁移并激活、且演示文档（含型号 FAQ）重新入库后，运行 `.venv/bin/python scripts/evaluate_ch04.py --dataset evals/ch04/holdout.jsonl --output ../dev-notes/evals/ch04/report.json`。真实评估会把检索证据发给配置的云端重排/生成/裁判模型，并把被判编造的个案写入 `faith_cases`；仅在明确授权现有资料向该外部服务发送后运行。报告包含四策略按桶 Recall@1/5/10、MRR、无答案误命中率，以及混合重排的生成忠实度、逐题证据与错误。
