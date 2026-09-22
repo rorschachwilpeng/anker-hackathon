@@ -39,7 +39,8 @@ function reset(next=mode) {
 }
 async function streamChat(response,view) {
   if(!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) throw new Error('没有收到有效的流式回复，请重试。');
-  const reader=response.body.getReader(); const decoder=new TextDecoder(); let buffer='', answer='', finished=false, reason='';
+  const reader=response.body.getReader(); const decoder=new TextDecoder(); let buffer='', answer='', finished=false, reason='', messageId=null;
+  let citations=new Map();
   try {
     while(!finished) {
       const {value,done}=await reader.read(); buffer += done?decoder.decode():decoder.decode(value,{stream:true});
@@ -50,21 +51,70 @@ async function streamChat(response,view) {
         const raw=lines.filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
         if(!raw) continue;
         const data=JSON.parse(raw);
-        if(event==='answer_reset') {answer='';view.bubble.textContent='正在查询…';}
+        if(event==='answer_reset') {answer='';citations=new Map();view.bubble.textContent='正在查询…';}
         if(event==='session') { if(!Number.isSafeInteger(data.conversation_id)||data.conversation_id<1) throw new Error('会话标识无效'); conversationId=data.conversation_id; }
         if(event==='tool_status') updateToolBadge(view,data);
+        if(event==='citations' && Array.isArray(data.items)) {
+          citations=new Map(data.items.filter(item=>Number.isSafeInteger(item.n)&&item.n>0&&Number.isSafeInteger(item.chunk_id)&&item.chunk_id>0)
+            .map(item=>[item.n,item]));
+        }
         if(event==='error') throw new Error(data.message || '回复中断，请重试。');
         if(event==='token') {
           if(typeof data.text!=='string') throw new Error('回复格式异常，请重试。');
           answer+=data.text; view.bubble.textContent=answer; scrollDown();
         }
-        if(event==='done') {reason=data.finish_reason; if(!['stop','length'].includes(reason)) throw new Error('回复未正常结束，请重试。'); finished=true; break;}
+        if(event==='done') {reason=data.finish_reason;messageId=data.message_id; if(!['stop','length'].includes(reason)) throw new Error('回复未正常结束，请重试。'); finished=true; break;}
       }
       if(done) break;
     }
     if(!finished || !answer.trim()) throw new Error('回复没有完整到达，请重试。');
-    return {answer,reason};
+    return {answer,reason,citations,messageId};
   } finally { await reader.cancel().catch(()=>{}); reader.releaseLock(); }
+}
+function renderCitations(view,answer,citations) {
+  const fragments=answer.split(/(\[\d+\])/g);
+  const nodes=fragments.map(fragment=>{
+    const n=/^\[(\d+)\]$/.exec(fragment)?.[1];
+    const source=n?citations.get(Number(n)):null;
+    if(!source) return document.createTextNode(fragment);
+    const button=document.createElement('button');button.type='button';button.className='citation-link';
+    button.textContent=fragment;button.setAttribute('aria-label',`查看引用 ${n} 的原文`);
+    button.onclick=()=>showCitation(source.chunk_id);
+    return button;
+  });
+  view.bubble.replaceChildren(...nodes);
+}
+async function showCitation(chunkId) {
+  const dialog=$('source-dialog');$('source-title').textContent='正在查找来源…';
+  $('source-path').textContent='';$('source-content').textContent='';dialog.showModal();
+  try {
+    const response=await fetch(`/knowledge/chunks/${chunkId}`);
+    if(!response.ok) throw new Error('这条来源暂时不可查看。');
+    const data=await response.json();
+    $('source-title').textContent=data.section_path||'知识原文';
+    $('source-path').textContent=data.source_file?`来源：${data.source_file}`:'暂无原文件路径';
+    $('source-content').textContent=data.answer||'';
+  } catch(error) {$('source-title').textContent=error.message;}
+}
+function addFeedback(view,messageId) {
+  if(!Number.isSafeInteger(messageId)||messageId<1||!Number.isSafeInteger(conversationId)) return;
+  const key=`feedback:${conversationId}:${messageId}`;
+  const footer=document.createElement('div');footer.className='feedback';footer.setAttribute('aria-label','本条回答的满意度');
+  const label=document.createElement('span');label.textContent='这条回答有帮助吗？';
+  const buttons=['👍','👎'].map((emoji,index)=>{
+    const button=document.createElement('button');button.type='button';button.textContent=emoji;
+    button.setAttribute('aria-label',index?'不满意':'满意');
+    return button;
+  });
+  const status=document.createElement('span');status.className='feedback-status';
+  const lock=(choice)=>{buttons.forEach((button,index)=>{button.disabled=true;button.classList.toggle('chosen',choice===(index?'down':'up'));});status.textContent='已反馈';};
+  const existing=sessionStorage.getItem(key);
+  if(existing==='up'||existing==='down') lock(existing);
+  buttons.forEach((button,index)=>button.onclick=()=>{
+    if(sessionStorage.getItem(key)) return;
+    const choice=index?'down':'up';sessionStorage.setItem(key,choice);lock(choice);
+  });
+  footer.append(label,...buttons,status);view.article.append(footer);
 }
 function showExtraction(data,view) {
   if(!data || Object.keys(data).sort().join(',')!=='expected_solution,order_id,request_type' || !Object.hasOwn(types,data.request_type) || ![data.order_id,data.expected_solution].every(v=>v===null||typeof v==='string')) throw new Error('提取结果格式异常，请重试。');
@@ -86,8 +136,9 @@ async function submit(event) {
     const response=await fetch(mode==='chat'?'/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='chat'?{message,conversation_id:conversationId}:{description:message}),signal:controller.signal});
     if(!response.ok) {const data=await response.json().catch(()=>({}));throw new Error(typeof data.detail==='string'?data.detail:`请求未成功（${response.status}），请检查输入后重试。`);}
     if(mode==='chat') {
-      const {answer,reason}=await streamChat(response,view);
+      const {answer,reason,citations,messageId}=await streamChat(response,view);
       if(reason==='length') note(view,'回复达到长度上限，内容可能不完整；本轮未加入对话记忆。');
+      if(reason==='stop') {renderCitations(view,answer,citations);addFeedback(view,messageId);}
 
     } else showExtraction(await response.json(),view);
     $('announcement').textContent='回复完成';

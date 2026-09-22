@@ -45,5 +45,10 @@
     </div>
   </main>
 </div>
+<dialog id="source-dialog" class="source-dialog" aria-labelledby="source-title">
+  <div class="source-head"><span>知识来源</span><button type="button" id="source-close" aria-label="关闭来源">×</button></div>
+  <h2 id="source-title"></h2><p id="source-path"></p><div id="source-content" class="source-content"></div>
+</dialog>
+<script>document.getElementById('source-close').onclick=()=>document.getElementById('source-dialog').close();</script>
 </body>
 </html>
