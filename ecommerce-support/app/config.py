@@ -19,10 +19,14 @@ class Settings(BaseSettings):
     embedding_base_url: str = 'https://api.siliconflow.cn/v1'
     embedding_model: Literal['BAAI/bge-m3'] = 'BAAI/bge-m3'
     embedding_api_key: SecretStr | None = None
+    rerank_base_url: str = 'https://api.siliconflow.cn/v1'
+    rerank_model: Literal['BAAI/bge-reranker-v2-m3'] = 'BAAI/bge-reranker-v2-m3'
+    rerank_api_key: SecretStr | None = None
+    rerank_score_threshold: float | None = Field(default=None, ge=0, le=1)
     milvus_uri: str = 'http://127.0.0.1:19530'
     knowledge_top_k: int = Field(default=5, ge=1, le=20)
     knowledge_score_threshold: float | None = Field(default=None, ge=-1, le=1)
-    knowledge_tool_timeout: float = Field(default=20, gt=0, le=60)
+    knowledge_tool_timeout: float = Field(default=60, gt=0, le=120)
     knowledge_worker_enabled: bool = False
     knowledge_worker_timezone: str = 'Asia/Shanghai'
     knowledge_extraction_max_tokens: int = Field(default=4096, ge=512, le=8192)

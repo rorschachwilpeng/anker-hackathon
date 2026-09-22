@@ -76,8 +76,10 @@ def create_app(
                 if collection == 'knowledge_hybrid_v1':
                     from app.knowledge.query import QueryUnderstanding
                     from app.knowledge.hybrid_retrieval import HybridKnowledgeSearch
+                    from app.knowledge.reranker import SiliconFlowReranker
                     knowledge_search = HybridKnowledgeSearch(knowledge_repo,embeddings,vectors,
-                        QueryUnderstanding(application.state.service.model,resolved_settings.structured_output_method))
+                        QueryUnderstanding(application.state.service.model,resolved_settings.structured_output_method),
+                        SiliconFlowReranker(client,resolved_settings),resolved_settings.rerank_score_threshold)
                 else:
                     knowledge_search = KnowledgeSearch(knowledge_repo, embeddings, vectors,
                         resolved_settings.knowledge_score_threshold, resolved_settings.knowledge_top_k)
