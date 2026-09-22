@@ -24,6 +24,8 @@ from app.knowledge.repository import KnowledgeRepository
 from app.knowledge.retrieval import KnowledgeSearch
 from app.knowledge.state import StateStore
 from app.knowledge.vectors import MilvusVectors
+from app.knowledge.quality import EvidenceGate
+from app.knowledge.quality_repository import QualityRepository
 
 
 UPSTREAM_ERROR = {"code": "upstream_error", "message": "模型服务暂时不可用，请稍后重试。"}
@@ -58,6 +60,9 @@ def create_app(
             database = Database(resolved_settings.database_url.get_secret_value())
             milvus = None
             knowledge_search = None
+            collection = 'knowledge'
+            application.state.knowledge_repo = None
+            application.state.knowledge_state = None
             try:
                 resolved_settings.ensure_knowledge_ready(search=True)
                 from pymilvus import AsyncMilvusClient
@@ -67,6 +72,8 @@ def create_app(
                 ).hexdigest()
                 state = StateStore(database, namespace='knowledge')
                 knowledge_repo = KnowledgeRepository(database.sessions, state=state, fingerprint=fingerprint)
+                application.state.knowledge_repo = knowledge_repo
+                application.state.knowledge_state = state
                 from app.knowledge.hybrid_vectors import HybridVectors
                 from app.knowledge.migration import active_collection
                 collection = await active_collection(state)
@@ -88,7 +95,11 @@ def create_app(
                     await milvus.close()
                     milvus = None
             application.state.chat_service = chat_service or ChatService(
-                resolved_settings, application.state.service.model, Repository(database.sessions), knowledge_search)
+                resolved_settings, application.state.service.model, Repository(database.sessions), knowledge_search,
+                quality_gate=(EvidenceGate(application.state.service.model,resolved_settings.structured_output_method)
+                              if collection == 'knowledge_hybrid_v1' and knowledge_search is not None else None),
+                quality_repo=(QualityRepository(database.sessions)
+                              if collection == 'knowledge_hybrid_v1' and knowledge_search is not None else None))
             try:
                 yield
             finally:
@@ -108,6 +119,31 @@ def create_app(
     @application.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get('/knowledge/chunks/{chunk_id}')
+    async def source_chunk(chunk_id: int):
+        repo = getattr(application.state,'knowledge_repo',None)
+        if repo is None or chunk_id <= 0:
+            raise HTTPException(404,'知识来源不存在')
+        rows = await repo.load_done([chunk_id])
+        row = rows.get(chunk_id)
+        if row is None:
+            raise HTTPException(404,'知识来源不存在')
+        source_file = None
+        state = getattr(application.state,'knowledge_state',None)
+        if state is not None:
+            root = (Path(__file__).resolve().parents[1]/'knowledge').resolve()
+            for _,payload in await state.entries('source:'):
+                if chunk_id in payload.get('ids',[]):
+                    source = payload.get('source','')
+                    if source.startswith('doc:'):
+                        path = Path(source[4:]).resolve()
+                        if not path.is_relative_to(root) or not path.is_file():
+                            raise HTTPException(404,'知识来源不存在')
+                        source_file = str(path.relative_to(root))
+                    break
+        return {'chunk_id':row.id,'section_path':row.draft.section_path,
+                'question':row.draft.questions,'answer':row.draft.answer,'source_file':source_file}
 
     @application.post("/chat")
     async def chat(request: ChatRequest) -> StreamingResponse:
