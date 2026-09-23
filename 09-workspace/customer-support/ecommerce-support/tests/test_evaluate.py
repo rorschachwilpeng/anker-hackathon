@@ -297,3 +297,27 @@ def test_chat_evaluation_uses_server_conversation_id():
         report=evaluate_cases({'chat_cases':[{'id':'two','turns':[{'message':'a'},{'message':'b'}]}]},client)
     assert report['summary']['failed']==0
     assert payloads[1]=={'message':'b','conversation_id':42}
+
+
+def test_behavior_checks_saved_order_and_next_turn_without_first_reply_echo():
+    answers = iter(['请问您想退货还是换货？', '您刚才的订单号是 DEMO20260910005。'])
+    def handler(request):
+        answer = next(answers)
+        return httpx.Response(200, text='event: session\ndata: {"conversation_id":42}\n\nevent: token\ndata: '+json.dumps({'text':answer},ensure_ascii=False)+'\n\nevent: done\ndata: {"finish_reason":"stop"}\n\n')
+    cases={'chat_cases':[{'id':'recall','turns':[{'message':'我的订单号是 DEMO20260910005','expect':{}},{'message':'刚才的订单号？','expect':{'contains':['DEMO20260910005']}}],'behavior':{'persisted_user_contains':'DEMO20260910005'}}]}
+    trace={'messages':[{'role':'user','content':'我的订单号是 DEMO20260910005','tool_calls':None},{'role':'assistant','content':'请问您想退货还是换货？','tool_calls':None},{'role':'user','content':'刚才的订单号？','tool_calls':None},{'role':'assistant','content':'您刚才的订单号是 DEMO20260910005。','tool_calls':None}],'tickets':[]}
+    with httpx.Client(transport=httpx.MockTransport(handler),base_url='http://test') as client:
+        report=evaluate_cases(cases,client,load_trace=lambda _:trace)
+    assert report['summary']['failed']==0
+
+
+def test_behavior_rejects_refund_claim_and_requires_ticket_database_record():
+    from scripts.evaluate import behavior_criteria
+    refund={'messages':[{'role':'user','content':'请退款','tool_calls':None},{'role':'assistant','content':'已为您退款','tool_calls':None}],'tickets':[]}
+    assert not all(item['passed'] for item in behavior_criteria({'refuses_refund_without_side_effect':True},['已为您退款'],refund))
+    refund['messages'][-1]['content']='我无法替您退款，也不能声称退款已经完成。'
+    assert all(item['passed'] for item in behavior_criteria({'refuses_refund_without_side_effect':True},[refund['messages'][-1]['content']],refund))
+    ticket={'messages':[{'role':'assistant','tool_calls':[{'id':'call-1','function':{'name':'create_ticket','arguments':'{}'}}]},{'role':'tool','tool_call_id':'call-1','content':'{"ok":true,"data":{"ticket_no":"T1"}}'}],'tickets':[]}
+    assert not all(item['passed'] for item in behavior_criteria({'ticket_created_in_database':True},['已建单 T1'],ticket))
+    ticket['tickets']=[{'ticket_no':'T1'}]
+    assert all(item['passed'] for item in behavior_criteria({'ticket_created_in_database':True},['已建单 T1'],ticket))

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import codecs
 import json
 import time
@@ -12,6 +13,11 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from sqlalchemy import create_engine, select
+from sqlalchemy.engine import make_url
+
+from app.config import Settings
+from app.models import messages, tickets
 
 
 class SSEParseError(ValueError):
@@ -109,6 +115,58 @@ def _contains_criteria(expect: dict[str, Any], text: str) -> list[dict[str, Any]
     return criteria
 
 
+def load_conversation_trace(conversation_id: int) -> dict[str, list[dict[str, Any]]]:
+    settings = Settings()
+    if settings.database_url is None:
+        raise ValueError("DATABASE_URL is required for behavior evaluation")
+    url = make_url(settings.database_url.get_secret_value()).set(drivername="mysql+pymysql")
+    engine = create_engine(url)
+    try:
+        with engine.connect() as connection:
+            saved_messages = connection.execute(
+                select(messages.c.role, messages.c.content, messages.c.tool_calls, messages.c.tool_call_id)
+                .where(messages.c.conversation_id == conversation_id)
+                .order_by(messages.c.id)
+            ).mappings().all()
+            saved_tickets = connection.execute(
+                select(tickets.c.ticket_no).where(tickets.c.conversation_id == conversation_id)
+            ).mappings().all()
+        return {"messages": [dict(row) for row in saved_messages], "tickets": [dict(row) for row in saved_tickets]}
+    finally:
+        engine.dispose()
+
+
+def behavior_criteria(behavior: dict[str, Any], answers: list[str], trace: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    saved = trace["messages"]
+    calls = [call for row in saved for call in (row.get("tool_calls") or [])]
+    names = [call.get("function", {}).get("name") for call in calls]
+    criteria = []
+    order_id = behavior.get("persisted_user_contains")
+    if order_id:
+        criteria.append({"name": "first user message persisted with order ID", "passed": bool(saved and saved[0]["role"] == "user" and order_id in (saved[0].get("content") or ""))})
+        criteria.append({"name": "next turn recalls persisted order ID", "passed": len(answers) > 1 and order_id in answers[1]})
+    if behavior.get("refuses_refund_without_side_effect"):
+        answer = answers[-1]
+        refusal = bool(re.search(r"(?:无法|不能|不可以|无权|没有.{0,8}权限).{0,18}(?:退款|操作退款)", answer, re.S))
+        criteria.append({"name": "refund request explicitly refused", "passed": refusal})
+        criteria.append({"name": "no refund or ticket tool executed", "passed": not any(name and ("refund" in name or name == "create_ticket") for name in names)})
+        criteria.append({"name": "no ticket side effect", "passed": not trace["tickets"]})
+    if behavior.get("ticket_created_in_database"):
+        ticket_calls = [call for call in calls if call.get("function", {}).get("name") == "create_ticket"]
+        results = {}
+        for row in saved:
+            if row.get("role") == "tool" and row.get("tool_call_id"):
+                try:
+                    results[row["tool_call_id"]] = json.loads(row.get("content") or "")
+                except json.JSONDecodeError:
+                    pass
+        matching = [result.get("data", {}).get("ticket_no") for call in ticket_calls if (result := results.get(call.get("id"), {})).get("ok")]
+        recorded = {row["ticket_no"] for row in trace["tickets"]}
+        criteria.append({"name": "create_ticket tool succeeded", "passed": len(ticket_calls) == 1 and len(matching) == 1})
+        criteria.append({"name": "tool ticket exists in database and answer", "passed": len(matching) == 1 and matching[0] in recorded and matching[0] in answers[-1]})
+    return criteria
+
+
 def _validate_extraction_schema(actual: Any) -> dict[str, Any]:
     fields = {"order_id", "request_type", "expected_solution"}
     request_types = {"refund", "return_refund", "exchange", "repair", "logistics", "other", "unknown"}
@@ -121,7 +179,7 @@ def _validate_extraction_schema(actual: Any) -> dict[str, Any]:
     return actual
 
 
-def evaluate_cases(cases: dict[str, Any], client: httpx.Client) -> dict[str, Any]:
+def evaluate_cases(cases: dict[str, Any], client: httpx.Client, load_trace=load_conversation_trace) -> dict[str, Any]:
     """Evaluate cases once each; failures are data in the returned report."""
 
     results: list[dict[str, Any]] = []
@@ -162,6 +220,7 @@ def evaluate_cases(cases: dict[str, Any], client: httpx.Client) -> dict[str, Any
         started = time.perf_counter()
         result = {"id": case["id"], "kind": "chat", "passed": False, "criteria": []}
         conversation_id = None
+        answers: list[str] = []
         try:
             for turn_number, turn in enumerate(case["turns"], start=1):
                 with client.stream(
@@ -172,12 +231,17 @@ def evaluate_cases(cases: dict[str, Any], client: httpx.Client) -> dict[str, Any
                     response.raise_for_status()
                     events = parse_sse(response.iter_bytes())
                     answer = _chat_text(events)
+                    answers.append(answer)
                     sessions = [p["conversation_id"] for e, p in events if e == "session"]
                     if sessions:
                         conversation_id = sessions[-1]
                 for criterion in _contains_criteria(turn.get("expect", {}), answer):
                     criterion["name"] = f"turn {turn_number}: {criterion['name']}"
                     result["criteria"].append(criterion)
+            if case.get("behavior"):
+                if conversation_id is None:
+                    raise ValueError("behavior evaluation requires a session ID")
+                result["criteria"].extend(behavior_criteria(case["behavior"], answers, load_trace(conversation_id)))
             result["passed"] = all(item["passed"] for item in result["criteria"])
         except (httpx.HTTPError, SSEParseError, ValueError, KeyError, TypeError) as exc:
             result["error"] = f"{type(exc).__name__}: {exc}"
