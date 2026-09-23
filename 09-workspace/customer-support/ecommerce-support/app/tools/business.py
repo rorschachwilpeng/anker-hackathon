@@ -23,6 +23,23 @@ class FaqArgs(StrictArgs):
 class TicketArgs(StrictArgs):
     description: str=Field(min_length=1,max_length=2000)
     ticket_type: Literal['售后','投诉','咨询']
+class S1ProKnowledgeArgs(StrictArgs):
+    query: str=Field(min_length=1,max_length=256)
+    confirmed_model: Literal['T2080']
+
+def build_s1pro_tools(knowledge_search):
+    @tool(args_schema=S1ProKnowledgeArgs)
+    async def search_support_knowledge(query: str, confirmed_model: str):
+        """仅检索已确认 T2080 型号的 eufy 官方售后知识及来源。"""
+        if knowledge_search is None:
+            raise ToolError('knowledge_not_configured','知识库尚未配置')
+        try:
+            rows=await knowledge_search.find_for_model(query,confirmed_model)
+            return pack_faq_result(query,rows)
+        except KnowledgeError as exc:
+            if exc.retryable:raise RetryableToolError('知识检索服务暂时不可用') from exc
+            raise ToolError(exc.code,'知识检索失败，暂时无法确认排障依据') from exc
+    return [search_support_knowledge]
 
 def build_tools(repo,context: ToolContext,knowledge_search=None):
     mock_cache={}

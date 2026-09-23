@@ -40,6 +40,25 @@ class KnowledgeSearch:
             })
         return items
 
+    async def find_for_model(self, query: str, confirmed_model: str) -> list[dict]:
+        vectors = await self.embeddings.encode([query])
+        hits = await self.vectors.search(vectors[0], 20)
+        accepted = [hit for hit in hits if hit.score >= self.threshold]
+        if not accepted:
+            return []
+        rows = await self.repo.load_done([hit.id for hit in accepted])
+        items = []
+        for hit in accepted:
+            row = rows.get(hit.id)
+            if row is None or row.content_hash != hit.content_hash:
+                continue
+            draft = row.draft
+            if draft.product_model != confirmed_model or not draft.source_url:
+                continue
+            items.append({"id": row.id, "answer": draft.answer, "product_model": draft.product_model,
+                          "source_title": draft.source_title, "source_url": draft.source_url})
+        return items
+
 
 def _outer_size(payload: dict) -> int:
     outer = {"ok": True, "data": payload, "error": None}
