@@ -19,6 +19,8 @@
 - 原验收实例占用 `127.0.0.1:8000`；迁入版本使用 `127.0.0.1:8001`，便于区分两套代码。
 - 本计划只验收通用电商底座。S1 Pro 资料、知识检索契约、任务状态及工单交接另行实施；不能把原有电商回复宣称为安克切片通过。
 
+**2026-09-23 验收口径修订（用户已确认）：** 原项目源码迁入一致、171 项单测与 35 项确定性契约测试通过、真实建单已落库；旧在线评估连续多次未全过，原因是首轮回答有时未复述已保存的订单号，以及明确拒绝退款的否定句包含了被禁止的字面短语。这些原始失败记录必须保留，不能宣称旧评估已通过。本阶段改按实际行为验收：订单号被保存且下一轮可找回；退款请求被明确拒绝，且未执行退款操作或产生退款副作用；明确请求建单时工具调用和数据库记录一致。Technical Builder 负责提出并实现可复核的行为断言，不能只删掉失败用例或改成恒通过。原始迁入与评估修订分开提交，不为通过旧字面断言修改 `/chat` 的通用回复逻辑。
+
 ---
 
 ### Task 1: 迁入运行项目并重跑基线
@@ -101,7 +103,7 @@
   /Users/pengyoutian/.codex/worktrees/5648/customer-support-validation/09-workspace/customer-support/ecommerce-support/.venv/bin/python scripts/evaluate.py --base-url http://127.0.0.1:8001 --output /tmp/anker-import-baseline-results.json
   ```
 
-  Expected: `failed=0`，报告位于 `/tmp/anker-import-baseline-results.json`；回归覆盖原有聊天、知识查询、会话续接和工具/工单行为。若 `failed>0`，先查工具调用和环境配置，不直接开始安克功能改造。
+  Expected: 先保留旧评估的原始报告 `/tmp/anker-import-baseline-results.json`，包括失败项；按上述修订口径增加可复核的行为评估并运行至 `failed=0`，报告中能区分“旧字面断言结果”与“新版行为验收结果”。若新版行为评估仍失败，先查实际工具调用、会话持久化和数据库副作用，不直接开始安克功能改造。
 
 - [ ] **Step 7: 检查差异并提交迁入底座**
 
@@ -113,7 +115,7 @@
   git status --short --branch
   ```
 
-  Expected: 提交只包含运行项目；`.env`、原有未提交文件不在提交内。
+  Expected: 首个提交只包含原样迁入的运行项目；评估修订另起提交并附测试结果。`.env`、原有未提交文件不在提交内。
 
 - [ ] **Step 8: 推送实施分支并交付验证证据**
 
@@ -122,7 +124,7 @@
   git rev-parse HEAD
   ```
 
-  Expected: 远端实施分支指向刚才的迁入提交。Technical Builder 向用户展示提交哈希、测试与回归结果，以及一条真实请求的“消息 → 模型工具选择 → 工具结果 → 工单记录”调用链。用户验收后再决定并入 `codex/product-agent-development`，不自动合并。
+  Expected: 远端实施分支包含原样迁入提交及独立的评估修订提交。Technical Builder 向用户展示两个提交哈希、旧评估原始失败、新行为评估通过证据，以及一条真实请求的“消息 → 模型工具选择 → 工具结果 → 工单记录”调用链。用户验收后再决定并入 `codex/product-agent-development`，不自动合并。
 
 ## 下一阶段接口
 
