@@ -23,7 +23,7 @@
 
 | 用途 | 官方来源 | 入库要求 |
 | --- | --- | --- |
-| 产品身份 | [eufy S1 Pro 用户指南页面（T2080）](https://service.eufy.com/article-description/eufy-S1-Pro-Przewodnik-U%C5%BCytkownika-T2080) | 将“S1 Pro”映射到候选产品 eufy Robot Vacuum Omni S1 Pro，型号 T2080；用户未确认前不直接套用排障步骤 |
+| 产品身份 | [eufy S1 Pro 产品支持页（含 T2080 用户指南）](https://service.eufy.com/product-description/a085g00000GjKGLAA3) | 将“S1 Pro”映射到候选产品 eufy Robot Vacuum Omni S1 Pro，型号 T2080；用户未确认前不直接套用排障步骤 |
 | 吸力变弱排查 | [What should I do if my S1 Pro's suction becomes weak?](https://service.eufy.com/article-description/What-should-I-do-if-my-S1-Pro-s-suction-becomes-weak) | 按原因与排查动作整理短知识片段，保留原文标题、URL、产品型号、语言和采集日期；对外展示来源，不把官网之外的推断写成官方结论 |
 | 升级交接信息 | [What information does eufy need to resolve a technical issue with my S1 Pro?](https://service.eufy.com/eu/article-description/What-information-does-eufy-need-to-resolve-a-technical-issue-with-my-S1-Pro) | 作为交接摘要字段的参考，不把“用户未提供的凭证或故障信息”填成已核实事实 |
 
