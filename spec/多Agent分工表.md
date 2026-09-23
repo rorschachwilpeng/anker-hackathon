@@ -1,6 +1,6 @@
 # 多 Agent 分工表
 
-最后更新：2026-09-19
+最后更新：2026-09-23
 
 ## 目的
 
@@ -14,12 +14,14 @@
 
 | 角色 | 唯一有效线程 | 当前工作树 | 状态 |
 | --- | --- | --- | --- |
-| Product Lead | `01a0bc97-f17d-7722-94cf-db142ea1718d` | `~/.codex/worktrees/5648/anker-ghost-in-the-shell-hackathon` | 有效；2026-09-20 完成只读接管检查 |
+| Product Lead | `01a0adb4-b39f-7070-a581-771cda40c4a7` | `~/.codex/worktrees/5648/anker-ghost-in-the-shell-hackathon` | 有效；用户于 2026-09-23 明确要求继续使用当前对话负责产品与派单 |
 | Technical Builder | `01a0b4e1-f4df-7133-8075-03f34c242983` | `~/.codex/worktrees/9a8c/anker-ghost-in-the-shell-hackathon` | 有效 |
-| 原 Product Lead | `01a0adb4-b39f-7070-a581-771cda40c4a7` | 与新 Product Lead 共用 `5648` 工作树 | 显示故障备份；不得继续派单，保留用于历史回溯 |
+| Product Lead 恢复线程 | `01a0bc97-f17d-7722-94cf-db142ea1718d` | 与当前 Product Lead 共用 `5648` 工作树 | 停用；不得继续派单，保留用于历史回溯 |
 | 误建的 Builder fork | `01a0b7dc-a0ab-79c1-b3e0-bfffc5d534e1` | 与 Product Lead 共用 `5648` 工作树 | 已归档；不得继续派单 |
 
 新增、替换或恢复长期线程前，总控必须先核对本表与现有线程列表；只有确认原线程已归档、损坏或无法恢复，才能创建替代线程，并在派发第一项任务前更新本表。Product Lead 和 Technical Builder 不得自行 fork 或新建对方角色作为临时替代。
+
+2026-09-23 用户在原 Product Lead 对话中明确恢复该对话作为当前 Product Lead；本表据此更正此前因桌面端显示故障作出的线程替换。恢复线程已被通知停止派单。既有技术交接以提交哈希、文件路径、动作和验收标准为准，不因这次身份更正重复执行。
 
 ## 当前分工
 
@@ -139,5 +141,5 @@
 
 | Agent | 状态 | 当前交付 | 下一交接 |
 | --- | --- | --- | --- |
-| Product Lead | 角色已由原 Anker 调研 Agent 调整，待输出确认版产品 Spec | 业务问题、产品架构 A、MVP 架构 B、MVP 边界、验收标准、能力与队友画像、Demo 叙事 | 将确认版产品 Spec 交给 Technical Builder 做接手审计 |
-| Technical Builder | 已建立线程；当前仅做技术接手审计，未默认进入开发 | 技术调研与复用评估、可行性、架构、数据与接口、工作量、风险和缩减选项 | 向 Product Lead 返回审计结论，完成一次产品取舍后共同锁定 MVP |
+| Product Lead | S1 Pro 垂直切片 Spec 已确认，底座迁入 Plan 已提交；细化下一阶段 Plan | 验收底座迁入结果，审阅 S1 Pro 后续实施计划 | 将通过验收的下一阶段计划交给 Technical Builder |
+| Technical Builder | 已收到底座迁入正式交接；等待核对更新后的线程登记并明确接单 | 按 `23ef8e34ae76a8b616800c96eade21500bb5bec0` 的迁入 Plan 验证底座，不提前开发 S1 Pro 功能 | 回传实施分支提交、测试结果与消息→工具→数据库链路 |
