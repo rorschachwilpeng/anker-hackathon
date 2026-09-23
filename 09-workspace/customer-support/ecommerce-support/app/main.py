@@ -24,6 +24,8 @@ from app.knowledge.repository import KnowledgeRepository
 from app.knowledge.retrieval import KnowledgeSearch
 from app.knowledge.state import StateStore
 from app.knowledge.vectors import MilvusVectors
+from app.s1pro.flow import S1ProFlow
+from app.s1pro.understanding import S1ProUnderstanding
 
 
 UPSTREAM_ERROR = {"code": "upstream_error", "message": "模型服务暂时不可用，请稍后重试。"}
@@ -38,10 +40,12 @@ def create_app(
     settings: Settings | None = None,
     service: CustomerSupportService | None = None,
     chat_service: ChatService | None = None,
+    s1pro_flow: S1ProFlow | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         application.state.chat_service = chat_service
+        application.state.s1pro_flow = s1pro_flow
         if service is not None:
             application.state.service = service
             yield
@@ -82,6 +86,11 @@ def create_app(
                     milvus = None
             application.state.chat_service = chat_service or ChatService(
                 resolved_settings, application.state.service.model, Repository(database.sessions), knowledge_search)
+            application.state.s1pro_flow = s1pro_flow or S1ProFlow(
+                Repository(database.sessions),
+                S1ProUnderstanding(application.state.service.model,resolved_settings.structured_output_method),
+                knowledge_search,
+            )
             try:
                 yield
             finally:
@@ -101,6 +110,13 @@ def create_app(
     @application.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.post('/s1pro/chat')
+    async def s1pro_chat(request: ChatRequest) -> dict[str, Any]:
+        flow=application.state.s1pro_flow
+        if flow is None:raise HTTPException(503,'S1 Pro service is unavailable')
+        try:return await flow.handle(request.message,request.conversation_id)
+        except LookupError:raise HTTPException(404,'会话不存在。') from None
 
     @application.post("/chat")
     async def chat(request: ChatRequest) -> StreamingResponse:
