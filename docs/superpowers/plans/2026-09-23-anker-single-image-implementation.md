@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- 需求依据：[单张图片 PRD](../specs/2026-09-23-anker-single-image-after-sales-prd.md)；上层边界：[初赛增强设计](../specs/2026-09-23-anker-initial-round-enhancements-design.md)。本计划仅实施多模态第一阶段，不包含情绪识别、图向量、图片知识库或客服后台重做。
+- 需求依据：[单张图片 PRD](../specs/2026-09-23-anker-single-image-after-sales-prd.md)；界面依据：[可交互上传原型](../../../04-方案设计/原型/2026-09-23-单图上传交互原型.html)；上层边界：[初赛增强设计](../specs/2026-09-23-anker-initial-round-enhancements-design.md)。本计划仅实施多模态第一阶段，不包含情绪识别、图向量、图片知识库或客服后台重做。
 - 代码只在项目的正式开发仓库与实施分支中修改；先核实仓库路径、分支、工作树状态。`codex/customer-support-import` 是只读基线，不能在知识仓库或历史副本中冒充代码交付。
 - 前置条件：`codex/anker-s1pro-implementation@8df71a2` 的已验收切片已安全进入 `codex/product-agent-development`，并在目标工作树复现 186 项测试、原底座 9/9、S1 Pro 10/10。未完成就停在前置条件，不开始本计划的功能任务；保留两个工作树所有未提交内容。
 - 图片限单张 JPEG/PNG，最大 5 MB；原图不入知识库、数据库、工单或 Git。会话只保存文字化观察及其“图片线索/未核实”标记。测试图应自有或有使用权。
@@ -135,11 +135,11 @@ assert search.calls == []  # 未曾提出 T2080 确认问题，不能把“是�
 
 **Files:** 修改 `app/static/index.html`、`app/static/chat.js`、`app/static/chat.css`；测试沿用 Task 2 的路由测试，并做浏览器手工验收。不重设计侧边栏或旧电商模式。
 
-**Interfaces:** 仅 `mode === 's1pro'` 展示图片文件选择控件、预览和移除按钮；有图片时 `submit()` 发送 `FormData(message, conversation_id, image)` 到 `/s1pro/chat/image`，无图片时继续发送原 JSON 到 `/s1pro/chat`。选择图片可使空文字消息可发送；其他模式保持原输入规则。
+**Interfaces:** 仅 `mode === 's1pro'` 在输入框左下角展示「＋」按钮，向上展开“添加 → 上传图片”菜单并打开原生文件选择器；整个消息输入框也接受单张图片拖放。选中后在文字区上方显示预览、文件名和移除入口。此处「文件夹」只是菜单图标，不代表支持上传文件夹。有图片时 `submit()` 发送 `FormData(message, conversation_id, image)` 到 `/s1pro/chat/image`，无图片时继续发送原 JSON 到 `/s1pro/chat`。选择图片可使空文字消息可发送；其他模式保持原输入规则。
 
 - [ ] 先在浏览器记录失败基线：当前 S1 Pro 模式没有图片控件；仅输入文字可发送。保留一张截图或简短录屏，不改用户数据。
-- [ ] HTML 添加带可见标签的 `input[type=file]`（`accept="image/png,image/jpeg"`）、缩略图容器和移除按钮；CSS 使用现有 composer 的字号、边框与焦点风格。切换模式或新建会话时清空未提交的文件和预览 URL。
-- [ ] JS 在选择时验证 MIME、5 MB 限制和单图约束，使用 `URL.createObjectURL()` 预览并在移除/重置时 `URL.revokeObjectURL()`；`syncInput()` 允许 S1 Pro 模式“只有图”。`busy()` 禁止重复提交与重复选图。用户气泡显示“已附 1 张图片”而不是 base64；回复区显示“正在识别图片”、真实追问、视觉失败或原有答复，不在响应前显示成功。
+- [ ] HTML 按原型加入可访问的「＋」菜单、隐藏但可由菜单触发的 `input[type=file]`（`accept="image/png,image/jpeg"`）、拖入提示、缩略图、文件名、移除按钮和输入框内错误提示；菜单目前只有「上传图片」。CSS 沿用现有 composer 的字号、边框与焦点风格，不复制原型顶部仅用于评审的状态按钮。切换模式或新建会话时清空未提交的文件和预览 URL。
+- [ ] JS 让文件选择和拖到整个 composer 进入同一校验：JPEG/PNG、5 MB、单图；已有图片时不静默替换第二张。用 `URL.createObjectURL()` 预览并在移除/重置时 `URL.revokeObjectURL()`；`syncInput()` 允许 S1 Pro 模式“只有图”。`busy()` 禁止重复提交与重复选图。用户气泡显示临时缩略图与“已附 1 张图片”，而不是 base64；回复区显示“正在识别图片”、真实追问、视觉失败或原有答复，不在响应前显示成功。
 
 ```javascript
 const hasImage = mode === 's1pro' && Boolean(selectedImage);
@@ -150,7 +150,7 @@ if (conversationId !== null) form.append('conversation_id', String(conversationI
 form.append('image', selectedImage);
 ```
 
-- [ ] 在浏览器手工验证：文字＋图、仅图、预览移除、格式和超限错误、上传中禁止重复点击、视觉失败改用文字继续、切换模式不残留图片。检查桌面与窄屏宽度；原文字入口和工单页仍可用。运行全量测试并提交上述三个前端文件，信息 `feat: add single-image S1 Pro composer`。
+- [ ] 在浏览器手工验证：点击「＋」打开/关闭菜单、菜单项调起本地选择器、拖到整个输入框、文字＋图、仅图、预览移除、第二张不暗中替换、格式和超限错误、上传中禁止重复点击、视觉失败改用文字继续、切换模式不残留图片。检查桌面与窄屏宽度；原文字入口和工单页仍可用。运行全量测试并提交上述三个前端文件，信息 `feat: add single-image S1 Pro composer`。
 
 ### Task 5：真实图文回归与交付证据
 
