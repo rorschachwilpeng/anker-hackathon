@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | Product Lead | `01a0adb4-b39f-7070-a581-771cda40c4a7` | `~/.codex/worktrees/5648/anker-ghost-in-the-shell-hackathon` | 有效；用户于 2026-09-23 明确要求继续使用当前对话负责产品与派单 |
 | Technical Builder | `01a0b4e1-f4df-7133-8075-03f34c242983` | `~/.codex/worktrees/9a8c/anker-ghost-in-the-shell-hackathon` | 有效 |
-| 售后调研 Agent | 创建中，派单前回填 | 待创建 | 已定义职责，尚未派发正式任务 |
+| 售后调研 Agent | `01a0cd9b-a0cf-70c2-9391-5b714351e54d` | `~/.codex/worktrees/aeb6/anker-ghost-in-the-shell-hackathon` | 有效；已启动首轮调研 |
 | 误建的 Builder fork | `01a0b7dc-a0ab-79c1-b3e0-bfffc5d534e1` | 与 Product Lead 共用 `5648` 工作树 | 已归档；不得继续派单 |
 
 新增、替换或恢复长期线程前，总控必须先核对本表与现有线程列表；只有确认原线程已归档、损坏或无法恢复，才能创建替代线程，并在派发第一项任务前更新本表。Product Lead 和 Technical Builder 不得自行 fork 或新建对方角色作为临时替代。
@@ -145,4 +145,4 @@
 | --- | --- | --- | --- |
 | Product Lead | S1 Pro 垂直切片 Spec 已确认，底座迁入 Plan 已提交；细化下一阶段 Plan | 验收底座迁入结果，审阅 S1 Pro 后续实施计划 | 将通过验收的下一阶段计划交给 Technical Builder |
 | Technical Builder | 已收到底座迁入正式交接；等待核对更新后的线程登记并明确接单 | 按 `23ef8e34ae76a8b616800c96eade21500bb5bec0` 的迁入 Plan 验证底座，不提前开发 S1 Pro 功能 | 回传实施分支提交、测试结果与消息→工具→数据库链路 |
-| 售后调研 Agent | 创建中 | 竞对售后 Agent、Anker 当前售后处理方式及业务痛点调研 | 将研究结论与证据账本提交给 Product Lead，技术相关证据同步 Technical Builder |
+| 售后调研 Agent | 首轮调研进行中 | 竞对售后 Agent、Anker 当前售后处理方式及业务痛点调研 | 将研究结论与证据账本提交给 Product Lead，技术相关证据同步 Technical Builder |
