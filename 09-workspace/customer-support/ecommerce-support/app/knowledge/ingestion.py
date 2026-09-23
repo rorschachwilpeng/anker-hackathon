@@ -1,5 +1,9 @@
 import asyncio
+from dataclasses import replace
+from datetime import date
+import json
 from pathlib import Path
+from urllib.parse import urlsplit
 from sqlalchemy import select
 from app.models import faq
 from app.knowledge.chunking import split_markdown
@@ -8,6 +12,36 @@ from app.knowledge.types import ChunkDraft, KnowledgeError
 
 class InjectedFailure(RuntimeError):
     pass
+
+
+def parse_directory(path):
+    root=Path(path).resolve()
+    if not root.is_dir():raise KnowledgeError('invalid_document_directory')
+    files=sorted(root.rglob('*.md'))
+    manifest_path=root/'sources.json'
+    sources=None
+    if manifest_path.exists():
+        try:
+            sources=json.loads(manifest_path.read_text(encoding='utf-8'))
+            if not isinstance(sources,dict) or set(sources)!={file.relative_to(root).as_posix() for file in files}:
+                raise ValueError('manifest files do not match markdown files')
+            for source in sources.values():
+                address=urlsplit(source['source_url'])
+                date.fromisoformat(source['retrieved_on'])
+                if (source['product_model']!='T2080' or not source['source_title'].strip()
+                        or address.scheme!='https' or address.netloc!='service.eufy.com'):
+                    raise ValueError('invalid source metadata')
+        except (ValueError,KeyError,TypeError,json.JSONDecodeError) as exc:
+            raise KnowledgeError('invalid_source_manifest') from exc
+    parsed=[]
+    for file in files:
+        if file.is_symlink():raise KnowledgeError('document_symlink_not_supported')
+        drafts=split_markdown(file.read_text(),file.stem,'manual' if 'manual' in file.stem else 'policy')
+        if sources is not None:
+            source=sources[file.relative_to(root).as_posix()]
+            drafts=[replace(draft,product_model=source['product_model'],source_title=source['source_title'],source_url=source['source_url']) for draft in drafts]
+        parsed.append((file,drafts))
+    return parsed
 
 class IngestionService:
     def __init__(self,repo,embeddings,vectors,state,*,failpoint=None):
@@ -52,11 +86,7 @@ class IngestionService:
 
     async def import_directory(self,path):
         root=Path(path).resolve()
-        if not root.is_dir():raise KnowledgeError('invalid_document_directory')
-        parsed=[]
-        for file in sorted(root.rglob('*.md')):
-            if file.is_symlink():raise KnowledgeError('document_symlink_not_supported')
-            parsed.append((file,split_markdown(file.read_text(),file.stem,'manual' if 'manual' in file.stem else 'policy')))
+        parsed=parse_directory(root)
         # Parse everything first; a malformed file must not trigger source deletion.
         current={'doc:'+str(file.resolve()) for file,_ in parsed}
         for file,drafts in parsed:await self.repo.replace_source('doc:'+str(file.resolve()),drafts)
