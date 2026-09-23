@@ -11,6 +11,9 @@ class ChunkDraft:
     section_path: str | None = None
     content_type: str | None = None
     is_key_clause: bool = False
+    product_model: str | None = None
+    source_title: str | None = None
+    source_url: str | None = None
 
 @dataclass(frozen=True)
 class ChunkSnapshot:
