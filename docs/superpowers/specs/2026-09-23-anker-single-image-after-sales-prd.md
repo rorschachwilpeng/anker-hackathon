@@ -2,7 +2,7 @@
 
 > 状态：待审阅｜2026-09-23
 > 类型：多模态第一阶段的产品需求与交付计划；不是逐文件编码清单。
-> 对应设计：[初赛增强设计](../specs/2026-09-23-anker-initial-round-enhancements-design.md)
+> 对应设计：[初赛增强设计](2026-09-23-anker-initial-round-enhancements-design.md)
 
 ## 1. 一句话说明
 
