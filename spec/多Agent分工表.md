@@ -16,12 +16,11 @@
 | --- | --- | --- | --- |
 | Product Lead | `01a0adb4-b39f-7070-a581-771cda40c4a7` | `~/.codex/worktrees/5648/anker-ghost-in-the-shell-hackathon` | 有效；用户于 2026-09-23 明确要求继续使用当前对话负责产品与派单 |
 | Technical Builder | `01a0b4e1-f4df-7133-8075-03f34c242983` | `~/.codex/worktrees/9a8c/anker-ghost-in-the-shell-hackathon` | 有效 |
-| Product Lead 恢复线程 | `01a0bc97-f17d-7722-94cf-db142ea1718d` | 与当前 Product Lead 共用 `5648` 工作树 | 停用；不得继续派单，保留用于历史回溯 |
 | 误建的 Builder fork | `01a0b7dc-a0ab-79c1-b3e0-bfffc5d534e1` | 与 Product Lead 共用 `5648` 工作树 | 已归档；不得继续派单 |
 
 新增、替换或恢复长期线程前，总控必须先核对本表与现有线程列表；只有确认原线程已归档、损坏或无法恢复，才能创建替代线程，并在派发第一项任务前更新本表。Product Lead 和 Technical Builder 不得自行 fork 或新建对方角色作为临时替代。
 
-2026-09-23 用户在原 Product Lead 对话中明确恢复该对话作为当前 Product Lead；本表据此更正此前因桌面端显示故障作出的线程替换。恢复线程已被通知停止派单。既有技术交接以提交哈希、文件路径、动作和验收标准为准，不因这次身份更正重复执行。
+2026-09-23 用户在原 Product Lead 对话中明确恢复该对话作为当前 Product Lead；此前因桌面端显示故障创建的恢复线程已永久删除。既有技术交接以提交哈希、文件路径、动作和验收标准为准，不因这次身份更正重复执行。
 
 ## 当前分工
 
