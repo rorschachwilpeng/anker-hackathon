@@ -118,6 +118,24 @@ def create_app(
         try:return await flow.handle(request.message,request.conversation_id)
         except LookupError:raise HTTPException(404,'会话不存在。') from None
 
+    @application.get('/s1pro/tickets')
+    async def s1pro_tickets() -> list[dict[str, Any]]:
+        flow=application.state.s1pro_flow
+        if flow is None:raise HTTPException(503,'S1 Pro service is unavailable')
+        return await flow.repo.list_s1pro_tickets()
+
+    @application.get('/s1pro/tickets/{ticket_no}')
+    async def s1pro_ticket(ticket_no: str) -> dict[str, Any]:
+        flow=application.state.s1pro_flow
+        if flow is None:raise HTTPException(503,'S1 Pro service is unavailable')
+        result=await flow.repo.get_s1pro_ticket(ticket_no)
+        if result is None:raise HTTPException(404,'工单不存在。')
+        return result
+
+    @application.get('/s1pro/workbench',include_in_schema=False)
+    async def s1pro_workbench() -> FileResponse:
+        return FileResponse(static_dir/'s1pro-workbench.html',headers={'Cache-Control':'no-cache'})
+
     @application.post("/chat")
     async def chat(request: ChatRequest) -> StreamingResponse:
         if application.state.chat_service is not None:

@@ -11,6 +11,10 @@ def _explicit_consent(message):
     return any(phrase in message for phrase in ('可以建单','同意建单','确认创建工单','请创建工单'))
 
 
+def _affirm_product(message):
+    return message.strip('。！!，, ').casefold() in ('是的', '对', '对的', '是', '确认', '没错', 'yes')
+
+
 class S1ProFlow:
     def __init__(self,repo,understanding,knowledge_search):
         self.repo=repo;self.understanding=understanding;self.knowledge_search=knowledge_search
@@ -24,23 +28,19 @@ class S1ProFlow:
                 raise LookupError('conversation_not_found')
         state=await self.repo.load_s1pro_state(conversation_id)
         await self.repo.append_message(conversation_id,'user',message)
+        tool_calls=0
 
         async def respond(action,reply,source=None,ticket_no=None):
             await self.repo.save_s1pro_state(conversation_id,state)
             await self.repo.append_message(conversation_id,'assistant',reply)
             return {'conversation_id':conversation_id,'action':action,'reply':reply,
-                    'source':source,'ticket_no':ticket_no}
+                    'source':source,'ticket_no':ticket_no,'tool_calls':tool_calls}
 
         if state.ticket_no and state.awaiting is None:
             return await respond('ticket_created',f'工单 {state.ticket_no} 已创建，请等待人工跟进。',ticket_no=state.ticket_no)
 
-        try:
-            understood=await self.understanding.interpret(message,state)
-        except Exception:
-            return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
-
         if state.awaiting=='ticket_confirmation':
-            if not (_explicit_consent(message) and understood.get('ticket_consent')):
+            if not _explicit_consent(message):
                 return await respond('confirm_ticket','需要人工跟进吗？如同意，请明确回复“可以建单”。')
             number=await self.repo.reserve_s1pro_ticket(conversation_id)
             state.ticket_no=number
@@ -49,21 +49,35 @@ class S1ProFlow:
             description=(f'产品型号：T2080；原始诉求：{original}；症状：{state.symptom or "待确认"}；'
                          f'已建议步骤：{"、".join(state.suggested_steps) or "无"}；'
                          f'已尝试步骤：{"、".join(state.completed_steps) or "未反馈"}；'
-                         f'用户反馈：{state.feedback or "未提供"}；未解决事项：吸力问题待人工核实。')
+                         f'用户反馈：{state.feedback or "未提供"}；'
+                         f'资料来源：{"、".join(source["url"] for source in state.sources) or "无"}；'
+                         '未解决事项：吸力问题待人工核实。')
             try:
                 await self.repo.create_ticket_once(number,conversation_id,description[:2000],'售后')
             except Exception:
-                return await respond('degraded','工单尚未创建成功，请稍后重试；已保留当前排障信息。')
+                return await respond('ticket_failed','工单尚未创建成功，请稍后重试；已保留当前排障信息。')
             state.awaiting=None
             return await respond('ticket_created',f'已创建售后工单 {number}，人工可查看排障摘要。',ticket_no=number)
 
+        try:
+            understood=await self.understanding.interpret(message,state)
+        except Exception:
+            return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
+
         if state.confirmed_model is None:
-            if not (_explicit_product(message) and understood.get('product_candidate')=='T2080'):
+            if not ((_explicit_product(message) and understood.get('product_candidate')=='T2080')
+                    or (state.awaiting=='product' and _affirm_product(message))):
                 state.awaiting='product'
                 state.symptom=state.symptom or understood.get('symptom_candidate')
                 return await respond('clarify_product','请确认：您说的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人吗？')
             state.confirmed_model='T2080'
-            state.symptom=state.symptom or understood.get('symptom_candidate') or '吸力变弱'
+            state.symptom=state.symptom or understood.get('symptom_candidate')
+
+        if state.symptom is None:
+            state.symptom=understood.get('symptom_candidate')
+        if state.symptom!='吸力变弱':
+            state.awaiting='ticket_confirmation'
+            return await respond('no_answer','目前没有可核实的对应排障步骤，不能凭其他问题的资料指导操作。如需人工跟进，请回复“可以建单”。')
 
         if state.awaiting=='feedback':
             if understood.get('feedback')=='resolved' and any(word in message for word in ('好了','恢复','正常','解决')):
@@ -79,6 +93,7 @@ class S1ProFlow:
         tools=build_s1pro_tools(self.knowledge_search)
         executor=ToolExecutor(tools,timeout_seconds=20)
         result=None
+        tool_calls=1
         async for event in executor.execute({'id':'s1pro-search','name':'search_support_knowledge',
                                              'args':{'query':'S1 Pro 吸力变弱 清理侧刷滚刷尘盒过滤器 检查胶条密封',
                                                      'confirmed_model':'T2080'}}):
@@ -96,4 +111,5 @@ class S1ProFlow:
         state.suggested_steps.append(next_step['answer'])
         state.awaiting='feedback'
         source={'title':next_step['source_title'],'url':next_step['source_url']}
+        if source not in state.sources:state.sources.append(source)
         return await respond('ask_feedback',f'先试一步：{next_step["answer"]} 完成后请告诉我吸力是否恢复。',source=source)

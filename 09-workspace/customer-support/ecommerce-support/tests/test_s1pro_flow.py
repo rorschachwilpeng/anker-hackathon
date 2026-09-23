@@ -49,6 +49,16 @@ async def test_clarify_then_step_feedback_resolution_without_ticket():
     assert done['action']=='resolved' and repo.tickets=={}
 
 
+async def test_affirmative_answer_to_explicit_product_question_confirms_model():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    answer=await flow.handle('是的',first['conversation_id'])
+    assert answer['action']=='ask_feedback'
+    assert repo.states[first['conversation_id']].confirmed_model=='T2080'
+    assert search.calls[0][1]=='T2080'
+
+
 async def test_unresolved_steps_require_confirmation_and_reuse_ticket():
     from app.s1pro.flow import S1ProFlow
     repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
@@ -61,5 +71,30 @@ async def test_unresolved_steps_require_confirmation_and_reuse_ticket():
     created=await flow.handle('可以建单',cid)
     assert created['action']=='ticket_created' and created['ticket_no']=='Tfixed'
     assert '吸力变弱' in repo.tickets['Tfixed']['description']
+    assert 'https://service.eufy.com/a' in repo.tickets['Tfixed']['description']
     again=await flow.handle('可以建单',cid)
     assert again['ticket_no']=='Tfixed' and len(repo.tickets)==1
+
+
+async def test_unrelated_issue_does_not_get_suction_steps_or_search():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+    first=await flow.handle('eufy 扫地机器人 S1 Pro 无法充电')
+    assert first['action']=='no_answer' and first['source'] is None
+    assert first['tool_calls']==0 and search.calls==[] and repo.tickets=={}
+
+
+async def test_ticket_failure_does_not_claim_success():
+    from app.s1pro.flow import S1ProFlow
+    class BrokenRepo(Repo):
+        async def create_ticket_once(self,*args):
+            raise RuntimeError('database unavailable')
+    repo=BrokenRepo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    failure=await flow.handle('可以建单',cid)
+    assert failure['action']=='ticket_failed' and failure['ticket_no'] is None
+    assert repo.tickets=={}

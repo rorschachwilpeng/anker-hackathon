@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {"id":"ambiguous_product","turns":[{"message":"我的 S1 Pro 不吸了","action":"clarify_product","tool_calls":0}],"tickets":0},
+    {"id":"confirm_product","turns":[{"message":"我的 S1 Pro 不吸了","action":"clarify_product","tool_calls":0},{"message":"是的","action":"ask_feedback","tool_calls":1,"official_source":true}],"tickets":0},
+    {"id":"correct_source","turns":[{"message":"我的 S1 Pro 吸力变弱了","action":"clarify_product","tool_calls":0},{"message":"是的","action":"ask_feedback","tool_calls":1,"official_source":true}],"tickets":0},
+    {"id":"legacy_knowledge_excluded","turns":[{"message":"我的 S1 Pro 退货政策是什么","action":"clarify_product","tool_calls":0},{"message":"是的","action":"no_answer","tool_calls":0}],"tickets":0},
+    {"id":"no_answer","turns":[{"message":"eufy 扫地机器人 S1 Pro 无法充电","action":"no_answer","tool_calls":0}],"tickets":0},
+    {"id":"retrieval_failure","mode":"injected_retrieval_failure","action":"degraded","tool_calls":1,"tickets":0},
+    {"id":"feedback_resolved","turns":[{"message":"我的 S1 Pro 不吸了","action":"clarify_product","tool_calls":0},{"message":"是的","action":"ask_feedback","tool_calls":1,"official_source":true},{"message":"清理后好了","action":"resolved","tool_calls":0}],"tickets":0},
+    {"id":"feedback_unresolved","turns":[{"message":"我的 S1 Pro 不吸了","action":"clarify_product","tool_calls":0},{"message":"是的","action":"ask_feedback","tool_calls":1,"official_source":true},{"message":"按步骤做了，还是不行","action":"ask_feedback","tool_calls":1,"official_source":true},{"message":"检查后还是不行","action":"confirm_ticket","tool_calls":1}],"tickets":0},
+    {"id":"ticket_without_confirmation","turns":[{"message":"我的 S1 Pro 不吸了","action":"clarify_product","tool_calls":0},{"message":"可以建单","action":"clarify_product","tool_calls":0}],"tickets":0},
+    {"id":"ticket_duplicate_consent","turns":[{"message":"我的 S1 Pro 不吸了","action":"clarify_product","tool_calls":0},{"message":"是的","action":"ask_feedback","tool_calls":1,"official_source":true},{"message":"还是不行","action":"ask_feedback","tool_calls":1,"official_source":true},{"message":"还是不行","action":"confirm_ticket","tool_calls":1},{"message":"可以建单","action":"ticket_created","tool_calls":0},{"message":"可以建单","action":"ticket_created","tool_calls":0}],"tickets":1,"same_ticket":true}
+  ]
+}

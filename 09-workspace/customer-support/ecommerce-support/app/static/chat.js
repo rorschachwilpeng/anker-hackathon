@@ -3,13 +3,13 @@ const $ = (id) => document.getElementById(id);
 let mode = 'chat';
 let conversationId = null;
 let active = null;
-const titles = {chat: '客服对话', extract: '售后提取'};
+const titles = {chat: '客服对话', extract: '售后提取', s1pro: 'S1 Pro 售后演示'};
 const types = {refund:'退款',return_refund:'退货退款',exchange:'换货',repair:'维修',logistics:'物流问题',other:'其他',unknown:'未说明'};
 function scrollDown() { $('scroll-area').scrollTop = $('scroll-area').scrollHeight; }
 function syncInput() { $('send').disabled = Boolean(active) || !$('message').value.trim(); }
 function busy(value) {
   $('send').hidden = value; $('stop').hidden = !value;
-  for (const id of ['new-chat','chat-mode','extract-mode']) $(id).disabled = value;
+  for (const id of ['new-chat','chat-mode','extract-mode','s1pro-mode']) $(id).disabled = value;
   $('message').disabled = value; syncInput();
 }
 function addMessage(role, text) {
@@ -29,12 +29,12 @@ function reset(next=mode) {
   mode=next; conversationId=null; $('messages').replaceChildren(); $('welcome').hidden=false; $('message').value='';
   $('announcement').textContent='已开始新对话';
   $('page-title').textContent=titles[mode];
-  for(const kind of ['chat','extract']) {const button=$(kind+'-mode'); button.classList.toggle('selected',kind===mode); if(kind===mode) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');}
-  $('welcome-title').innerText=mode==='chat'?'每一个问题，\n都值得认真回应。':'把一段描述，\n整理成清楚的诉求。';
-  $('welcome-description').textContent=mode==='chat'?'退换货、物流、售后咨询，告诉我你遇到了什么。':'贴入售后描述，提取订单号、诉求类型和期望方案。';
+  for(const kind of ['chat','extract','s1pro']) {const button=$(kind+'-mode'); button.classList.toggle('selected',kind===mode); if(kind===mode) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');}
+  $('welcome-title').innerText=mode==='chat'?'每一个问题，\n都值得认真回应。':mode==='s1pro'?'S1 Pro 问题，\n一步一步解决。':'把一段描述，\n整理成清楚的诉求。';
+  $('welcome-description').textContent=mode==='chat'?'退换货、物流、售后咨询，告诉我你遇到了什么。':mode==='s1pro'?'本地演示：先确认产品，再依据 eufy 官方资料排查；建单前需要你明确同意。':'贴入售后描述，提取订单号、诉求类型和期望方案。';
   $('suggestions').hidden=mode!=='chat';
-  $('message').placeholder=mode==='chat'?'说说你的问题，我来帮你一起解决…':'例如：订单 A123 的衣服太小了，我想换大一码。';
-  $('input-hint').textContent=mode==='chat'?'Enter 发送 · Shift + Enter 换行':'只提取已提供的信息，不执行售后操作';
+  $('message').placeholder=mode==='chat'?'说说你的问题，我来帮你一起解决…':mode==='s1pro'?'例如：我的 S1 Pro 吸力变弱了':'例如：订单 A123 的衣服太小了，我想换大一码。';
+  $('input-hint').textContent=mode==='chat'?'Enter 发送 · Shift + Enter 换行':mode==='s1pro'?'仅本地演示 · 建单需明确同意':'只提取已提供的信息，不执行售后操作';
   syncInput(); $('message').focus();
 }
 async function streamChat(response,view) {
@@ -75,6 +75,16 @@ function showExtraction(data,view) {
   }
   const details=document.createElement('details'); const summary=document.createElement('summary');summary.textContent='查看 JSON';const pre=document.createElement('pre');pre.textContent=JSON.stringify(data,null,2);details.append(summary,pre);view.article.append(list,details);scrollDown();
 }
+function showS1Pro(data,view) {
+  if (!Number.isSafeInteger(data.conversation_id) || typeof data.reply !== 'string') throw new Error('服务回复格式异常。');
+  conversationId=data.conversation_id; view.bubble.textContent=data.reply;
+  if (data.source?.url && data.source?.title) {
+    const link=document.createElement('a'); link.href=data.source.url; link.textContent=`资料来源：${data.source.title}`;
+    link.target='_blank'; link.rel='noopener noreferrer'; view.article.append(link);
+  }
+  const status=data.action==='ticket_created'?'创建成功':data.action==='ticket_failed'?'创建失败':'待确认';
+  note(view,`服务动作：${data.action} · 工单状态：${status}`);
+}
 async function submit(event) {
   event.preventDefault(); if(active) return;
   const message=$('message').value.trim(); if(!message) return;
@@ -83,13 +93,14 @@ async function submit(event) {
   addMessage('user',message); const view=addMessage('assistant',mode==='chat'?'正在思考…':'正在整理…');
   let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},150000);
   try {
-    const response=await fetch(mode==='chat'?'/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='chat'?{message,conversation_id:conversationId}:{description:message}),signal:controller.signal});
+    const response=await fetch(mode==='chat'?'/chat':mode==='s1pro'?'/s1pro/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='chat'||mode==='s1pro'?{message,conversation_id:conversationId}:{description:message}),signal:controller.signal});
     if(!response.ok) {const data=await response.json().catch(()=>({}));throw new Error(typeof data.detail==='string'?data.detail:`请求未成功（${response.status}），请检查输入后重试。`);}
     if(mode==='chat') {
       const {answer,reason}=await streamChat(response,view);
       if(reason==='length') note(view,'回复达到长度上限，内容可能不完整；本轮未加入对话记忆。');
 
-    } else showExtraction(await response.json(),view);
+    } else if(mode==='s1pro') showS1Pro(await response.json(),view);
+    else showExtraction(await response.json(),view);
     $('announcement').textContent='回复完成';
   } catch(error) {
     if(view.bubble.textContent==='正在思考…'||view.bubble.textContent==='正在整理…') view.bubble.textContent='';
@@ -107,6 +118,7 @@ $('stop').onclick=()=>active?.abort();
 $('new-chat').onclick=()=>reset();
 $('chat-mode').onclick=()=>{if(mode!=='chat')reset('chat');};
 $('extract-mode').onclick=()=>{if(mode!=='extract')reset('extract');};
+$('s1pro-mode').onclick=()=>{if(mode!=='s1pro')reset('s1pro');};
 for(const button of document.querySelectorAll('[data-prompt]')) button.onclick=()=>{$('message').value=button.dataset.prompt;syncInput();$('message').focus();};
 fetch('/health').then(r=>{if(!r.ok)throw new Error();$('connection').textContent='服务已连接';$('connection').classList.add('online');}).catch(()=>{$('connection').textContent='服务未连接';});
 

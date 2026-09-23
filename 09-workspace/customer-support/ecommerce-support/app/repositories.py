@@ -68,3 +68,32 @@ class Repository:
                 state.ticket_no='T'+uuid.uuid4().hex[:30]
                 await session.execute(update(conversations).where(conversations.c.id==conversation_id).values(task_state=asdict(state)))
             return state.ticket_no
+
+    async def list_s1pro_tickets(self):
+        from app.s1pro.state import S1ProState
+        async with self.sessions() as session:
+            rows=(await session.execute(select(tickets,conversations.c.task_state).join(
+                conversations,tickets.c.conversation_id==conversations.c.id
+            ).order_by(tickets.c.created_at.desc()).limit(50))).mappings().all()
+        result=[]
+        for row in rows:
+            state=S1ProState.from_dict(row['task_state'])
+            if state.confirmed_model=='T2080':
+                result.append({'ticket_no':row['ticket_no'],'product_model':state.confirmed_model,
+                               'symptom':state.symptom,'status':row['status']})
+        return result
+
+    async def get_s1pro_ticket(self, number):
+        from app.s1pro.state import S1ProState
+        async with self.sessions() as session:
+            row=(await session.execute(select(tickets,conversations.c.task_state).join(
+                conversations,tickets.c.conversation_id==conversations.c.id
+            ).where(tickets.c.ticket_no==number))).mappings().first()
+        if row is None:return None
+        state=S1ProState.from_dict(row['task_state'])
+        if state.confirmed_model!='T2080':return None
+        return {'ticket_no':row['ticket_no'],'conversation_id':row['conversation_id'],
+                'product_model':state.confirmed_model,'symptom':state.symptom,
+                'suggested_steps':state.suggested_steps,'completed_steps':state.completed_steps,
+                'feedback':state.feedback,'sources':state.sources,
+                'description':row['description'],'status':row['status']}

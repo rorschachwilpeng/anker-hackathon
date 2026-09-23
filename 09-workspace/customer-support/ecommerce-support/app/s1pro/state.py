@@ -8,6 +8,7 @@ class S1ProState:
     symptom: str | None = None
     suggested_steps: list[str] = field(default_factory=list)
     completed_steps: list[str] = field(default_factory=list)
+    sources: list[dict[str, str]] = field(default_factory=list)
     feedback: str | None = None
     awaiting: Literal['product', 'feedback', 'ticket_confirmation'] | None = None
     ticket_no: str | None = None
