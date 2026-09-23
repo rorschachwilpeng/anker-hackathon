@@ -13,6 +13,7 @@ dependencies = [
   "aiomysql",
   "cryptography",
   "httpx",
+  "python-multipart",
   "pymilvus==2.6.17",
   "langchain-core",
   "langchain-openai",

@@ -7,7 +7,7 @@ from typing import Any
 
 import anyio
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -26,9 +26,13 @@ from app.knowledge.state import StateStore
 from app.knowledge.vectors import MilvusVectors
 from app.s1pro.flow import S1ProFlow
 from app.s1pro.understanding import S1ProUnderstanding
+from app.s1pro.vision import VisionClient, VisionError, VisualObservation
 
 
 UPSTREAM_ERROR = {"code": "upstream_error", "message": "模型服务暂时不可用，请稍后重试。"}
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+JPEG_MAGIC = b"\xff\xd8\xff"
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
 def _sse(event: str, payload: dict[str, Any]) -> str:
@@ -41,11 +45,13 @@ def create_app(
     service: CustomerSupportService | None = None,
     chat_service: ChatService | None = None,
     s1pro_flow: S1ProFlow | None = None,
+    vision_client: VisionClient | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         application.state.chat_service = chat_service
         application.state.s1pro_flow = s1pro_flow
+        application.state.vision_client = vision_client
         if service is not None:
             application.state.service = service
             yield
@@ -91,6 +97,9 @@ def create_app(
                 S1ProUnderstanding(application.state.service.model,resolved_settings.structured_output_method),
                 knowledge_search,
             )
+            application.state.vision_client = vision_client or VisionClient(
+                resolved_settings, http_client=client
+            )
             try:
                 yield
             finally:
@@ -117,6 +126,45 @@ def create_app(
         if flow is None:raise HTTPException(503,'S1 Pro service is unavailable')
         try:return await flow.handle(request.message,request.conversation_id)
         except LookupError:raise HTTPException(404,'会话不存在。') from None
+
+    @application.post('/s1pro/chat/image')
+    async def s1pro_chat_image(
+        message: str = Form(default=""),
+        conversation_id: int | None = Form(default=None),
+        image: UploadFile = File(...),
+    ) -> dict[str, Any]:
+        flow = application.state.s1pro_flow
+        if flow is None:
+            raise HTTPException(503, 'S1 Pro service is unavailable')
+
+        image_bytes = await image.read(MAX_IMAGE_BYTES + 1)
+        if len(image_bytes) > MAX_IMAGE_BYTES:
+            raise HTTPException(413, '图片不能超过 5 MB。')
+
+        mime_type = image.content_type or ''
+        valid_png = mime_type == 'image/png' and image_bytes.startswith(PNG_MAGIC)
+        valid_jpeg = mime_type == 'image/jpeg' and image_bytes.startswith(JPEG_MAGIC)
+        if not (valid_png or valid_jpeg):
+            raise HTTPException(415, '仅支持格式与文件内容一致的 JPEG 或 PNG 图片。')
+
+        observation: VisualObservation | None = None
+        vision = application.state.vision_client
+        image_failed = vision is None
+        if vision is not None:
+            try:
+                observation = await vision.analyze(image_bytes, mime_type)
+            except VisionError:
+                image_failed = True
+
+        try:
+            return await flow.handle(
+                message,
+                conversation_id,
+                observation=observation,
+                image_failed=image_failed,
+            )
+        except LookupError:
+            raise HTTPException(404, '会话不存在。') from None
 
     @application.get('/s1pro/tickets')
     async def s1pro_tickets() -> list[dict[str, Any]]:
