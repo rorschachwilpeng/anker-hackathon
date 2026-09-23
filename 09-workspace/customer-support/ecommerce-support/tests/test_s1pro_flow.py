@@ -59,6 +59,19 @@ async def test_affirmative_answer_to_explicit_product_question_confirms_model():
     assert search.calls[0][1]=='T2080'
 
 
+async def test_product_affirmation_does_not_depend_on_another_model_call():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    class UnavailableUnderstanding:
+        async def interpret(self,message,state):
+            raise RuntimeError('model unavailable')
+    flow.understanding=UnavailableUnderstanding()
+    answer=await flow.handle('是的',first['conversation_id'])
+    assert answer['action']=='ask_feedback'
+    assert answer['source']['url']=='https://service.eufy.com/a'
+
+
 async def test_unresolved_steps_require_confirmation_and_reuse_ticket():
     from app.s1pro.flow import S1ProFlow
     repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())

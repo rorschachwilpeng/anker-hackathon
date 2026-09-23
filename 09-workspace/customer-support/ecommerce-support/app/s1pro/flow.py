@@ -59,10 +59,13 @@ class S1ProFlow:
             state.awaiting=None
             return await respond('ticket_created',f'已创建售后工单 {number}，人工可查看排障摘要。',ticket_no=number)
 
-        try:
-            understood=await self.understanding.interpret(message,state)
-        except Exception:
-            return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
+        if state.awaiting=='product' and _affirm_product(message):
+            understood={}
+        else:
+            try:
+                understood=await self.understanding.interpret(message,state)
+            except Exception:
+                return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
 
         if state.confirmed_model is None:
             if not ((_explicit_product(message) and understood.get('product_candidate')=='T2080')
