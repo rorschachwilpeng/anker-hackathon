@@ -193,6 +193,25 @@ class ChatService:
                 answer='请告诉我需要核实的订单、商品或售后问题，我会根据可查到的资料答复。'
                 reason='stop'
                 yield StreamEvent('token',{'text':answer})
+            elif (self.knowledge_search is not None
+                    and getattr(self.knowledge_search,'repo',None) is not None):
+                # A follow-up can reuse a cited answer from conversation history
+                # without invoking query_faq again. Revalidate those historical IDs
+                # against the authoritative store and resend their UI mapping.
+                cited={int(n) for n in re.findall(r'\[(\d+)\]',answer)}
+                historical=set()
+                for group in turn.turns:
+                    for message in group:
+                        if isinstance(message,AIMessage) and isinstance(message.content,str):
+                            historical.update(int(n) for n in re.findall(r'\[(\d+)\]',message.content))
+                ids=sorted(cited & historical)
+                if ids:
+                    rows=await self.knowledge_search.repo.load_done(ids)
+                    citation_map={i:Evidence(i,i,rows[i].draft.section_path,
+                        rows[i].draft.questions,rows[i].draft.answer) for i in ids if i in rows}
+                    if citation_map:
+                        yield StreamEvent('citations',{'items':[{'n':e.n,'chunk_id':e.chunk_id,'section_path':e.section_path}
+                            for e in citation_map.values()]})
             if not answer.strip() or reason not in ('stop','length'):raise ChatProtocolError('unfinished response')
             message_id=await self.repo.append_message(cid,'assistant',answer) if reason=='stop' else None
             yield StreamEvent('done',{'finish_reason':reason,**({'message_id':message_id} if message_id else {})})

@@ -132,3 +132,25 @@ async def test_dense_faq_without_citation_keeps_previous_answer_behavior():
                     FakeModel([[call],[AIMessageChunk(content='满99元包邮。',response_metadata={'finish_reason':'stop'})]]),repo,Search())
     [e async for e in svc.stream(await svc.prepare('邮费是多少',None))]
     assert repo.rows[-1]['content']=='满99元包邮。'
+
+
+async def test_direct_followup_revalidates_citations_copied_from_history():
+    from app.chat_service import ChatService
+    from app.config import Settings
+    from app.knowledge.types import ChunkDraft,ChunkSnapshot
+    class KnowledgeRepo:
+        async def load_done(self,ids):
+            return {125:ChunkSnapshot(125,ChunkDraft('退货','退货政策','签收7天内可申请退货。','政策/退货'),'a'*64)}
+    class Search:
+        repo=KnowledgeRepo()
+    model=FakeModel([[AIMessageChunk(content='仍按签收7天内退货政策执行[125]。',response_metadata={'finish_reason':'stop'})]])
+    repo=MemoryRepository()
+    svc=ChatService(Settings(openai_base_url='http://example.invalid',openai_model='fake',openai_api_key='fake'),
+                    model,repo,Search())
+    cid=await repo.new_conversation('local-demo')
+    await repo.append_message(cid,'user','退货政策是怎样的？')
+    await repo.append_message(cid,'assistant','签收7天内可申请退货[125]。')
+    events=[e async for e in svc.stream(await svc.prepare('还是这个政策吗？',cid))]
+    citations=[e.data['items'] for e in events if e.event=='citations']
+    assert citations==[[{'n':125,'chunk_id':125,'section_path':'政策/退货'}]]
+    assert events[-1].event=='done'
