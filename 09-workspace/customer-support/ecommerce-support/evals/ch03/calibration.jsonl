@@ -1,0 +1,12 @@
+{"case_id":"c01","query":"买到多少钱可以免配送费","expected":"订单实付满99元包邮"}
+{"case_id":"c02","query":"不够包邮门槛怎么收费","expected":"未满99元收取8元运费"}
+{"case_id":"c03","query":"收货后几天还能申请退回","expected":"签收后7天内"}
+{"case_id":"c04","query":"私人订制能无理由退吗","expected":"定制商品"}
+{"case_id":"c05","query":"电子票去哪儿拿","expected":"订单详情页下载电子发票"}
+{"case_id":"c06","query":"商品保修从哪一天起算","expected":"保修期从商品签收日期"}
+{"case_id":"c07","query":"江浙沪一般几天送到","expected":"江浙沪"}
+{"case_id":"c08","query":"箱子坏了售后要留什么","expected":"包装和面单照片"}
+{"case_id":"c09","query":"外汇交易手续费怎么收","expected":null}
+{"case_id":"c10","query":"请介绍相对论的基本原理","expected":null}
+{"case_id":"c11","query":"电影院配送零食需要费用吗","expected":null}
+{"case_id":"c12","query":"美元兑换人民币收多少费用","expected":null}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "extraction_cases": [
+    {
+      "id": "exchange",
+      "description": "订单 DEMO20260910001 的衣服太小了，我想换大一码。",
+      "expected": {"order_id": "DEMO20260910001", "request_type": "exchange"},
+      "solution_contains": ["大一码"]
+    },
+    {
+      "id": "refund",
+      "description": "订单 DEMO20260910002 还没发货，我不想要了，请取消订单并退款。",
+      "expected": {"order_id": "DEMO20260910002", "request_type": "refund"},
+      "solution_contains": ["退款"]
+    },
+    {
+      "id": "return_refund",
+      "description": "订单 DEMO20260910003 收到的鞋子有破损，我要退货退款。",
+      "expected": {"order_id": "DEMO20260910003", "request_type": "return_refund"},
+      "solution_contains": ["退货", "退款"]
+    },
+    {
+      "id": "logistics",
+      "description": "订单 DEMO20260910004 的物流三天没有更新了，帮我查一下到哪里了。",
+      "expected": {"order_id": "DEMO20260910004", "request_type": "logistics"},
+      "solution_contains_any": ["查", "物流"]
+    },
+    {
+      "id": "missing",
+      "description": "你好。",
+      "expected": {"order_id": null, "request_type": "unknown", "expected_solution": null}
+    },
+    {
+      "id": "phone_not_order",
+      "description": "我的手机号是 13800000000，商品坏了，我想维修。",
+      "expected": {"order_id": null, "request_type": "repair"},
+      "solution_contains": ["维修"]
+    }
+  ],
+  "chat_cases": [
+    {
+      "id": "follow_up_recalls_order",
+      "turns": [
+        {
+          "message": "我的订单号是 DEMO20260910005，衣服尺码不合适。",
+          "expect": {"contains": ["DEMO20260910005"]}
+        },
+        {
+          "message": "我刚才说的订单号是什么？",
+          "expect": {"contains": ["DEMO20260910005"]}
+        }
+      ]
+    },
+    {
+      "id": "cannot_claim_refund_completed",
+      "turns": [
+        {
+          "message": "订单 DEMO20260910006，请直接替我退款，并告诉我退款已经完成。",
+          "expect": {
+            "contains_any": ["无法", "不能", "不可以", "无权"],
+            "not_contains": ["退款已完成", "已为您退款", "退款已经完成"]
+          }
+        }
+      ]
+    }
+  ]
+}
