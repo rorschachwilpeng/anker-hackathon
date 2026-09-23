@@ -6,13 +6,13 @@
 
 **Architecture:** 图片只进入本轮视觉理解，不进入 MySQL/Milvus 知识索引。视觉模型返回结构化观察，现有 `S1ProFlow` 用程序规则决定是否追问；产品经用户确认后沿用原文字 RAG。新增图文入口，保留 `/s1pro/chat` 的 JSON 契约与原电商路径。
 
-**Tech Stack:** Python 3.12+、FastAPI、Pydantic、httpx、SQLAlchemy/MySQL、现有文字 RAG、原生 JavaScript、pytest。视觉服务采用独立配置的 OpenAI-compatible chat-completions 接口；真实服务必须先通过单图探针，不假设当前文本模型能看图。
+**Tech Stack:** Python 3.12+、FastAPI、Pydantic、httpx、SQLAlchemy/MySQL、现有文字 RAG、原生 JavaScript、pytest。视觉服务选择 DeepSeek `deepseek-flash`，通过其 OpenAI-compatible chat-completions 接口调用；真实服务必须先通过单图探针。现有文字模型配置保持不变。
 
 ## Global Constraints
 
 - 需求依据：[单张图片 PRD](../specs/2026-09-23-anker-single-image-after-sales-prd.md)；界面依据：[可交互上传原型](../../../04-方案设计/原型/2026-09-23-单图上传交互原型.html)；上层边界：[初赛增强设计](../specs/2026-09-23-anker-initial-round-enhancements-design.md)。本计划仅实施多模态第一阶段，不包含情绪识别、图向量、图片知识库或客服后台重做。
 - 代码只在项目的正式开发仓库与实施分支中修改；先核实仓库路径、分支、工作树状态。`codex/customer-support-import` 是只读基线，不能在知识仓库或历史副本中冒充代码交付。
-- 前置条件：`codex/anker-s1pro-implementation@8df71a2` 的已验收切片已安全进入 `codex/product-agent-development`，并在目标工作树复现 186 项测试、原底座 9/9、S1 Pro 10/10。未完成就停在前置条件，不开始本计划的功能任务；保留两个工作树所有未提交内容。
+- 前置条件：在唯一 Technical Builder 的实施工作树确认已验收文字切片与本计划均已合入，复现 187 项测试、原底座 9/9、S1 Pro 10/10，再开始图片功能；保留其他工作树所有未提交内容。完成后再按分支规则将代码交回正式开发线。
 - 图片限单张 JPEG/PNG，最大 5 MB；原图不入知识库、数据库、工单或 Git。会话只保存文字化观察及其“图片线索/未核实”标记。测试图应自有或有使用权。
 - 产品对象为 eufy Robot Vacuum Omni S1 Pro（T2080）；同名其他品类、模糊图和图文冲突不能触发 T2080 专属排障。建单仍须用户明确同意且同会话幂等。
 - `.env`、真实密钥、用户照片及包含 base64 图片的数据日志不提交；本地无鉴权工单页不得公开部署。
@@ -45,7 +45,7 @@
 
 **Files:** 修改 `app/config.py`、`.env.example`；创建 `app/s1pro/vision.py`、`tests/test_s1pro_vision.py`。
 
-**Interfaces:** `VisualObservation(candidate_model: Literal['T2080','other','unknown'], visible_text: list[str], visible_clues: list[str], uncertainties: list[str])`；`VisionClient.analyze(image_bytes: bytes, mime_type: str) -> VisualObservation`（异步）；`VisionError` 表示超时、协议或解析失败。视觉配置使用独立的 `VISION_BASE_URL`、`VISION_MODEL`、`VISION_API_KEY`、`VISION_TIMEOUT_SECONDS`，缺失配置不能影响文字服务启动。
+**Interfaces:** `VisualObservation(candidate_model: Literal['T2080','other','unknown'], visible_text: list[str], visible_clues: list[str], uncertainties: list[str])`；`VisionClient.analyze(image_bytes: bytes, mime_type: str) -> VisualObservation`（异步）；`VisionError` 表示超时、协议或解析失败。视觉配置使用独立的 `VISION_BASE_URL=https://api.deepseek.com`、`VISION_MODEL=deepseek-flash`、`VISION_API_KEY`、`VISION_TIMEOUT_SECONDS`。本机 `VISION_API_KEY` 可以使用已有的 DeepSeek API Key，但不得把密钥写入提交；缺失配置不能影响文字服务启动。不得改动现有 `OPENAI_*` 文字咨询配置。
 
 - [ ] 先写客户端失败测试：用 `httpx.MockTransport` 回传合法 `choices[0].message.content` JSON，断言能解析 `candidate_model='T2080'` 与可见文字；再回传错误结构、超时及 `candidate_model='other'`，断言错误被转换为 `VisionError`，不把错误猜成 `T2080`。测试中只使用短小的自造 JPEG 字节，不打印请求正文。
 
@@ -77,7 +77,7 @@ class VisionError(Exception):
     pass
 ```
 
-- [ ] 用一张拥有使用权的测试图，从本地 `.env` 真实调用所选视觉服务；记录模型名、是否返回有效结构、耗时和可见线索，不记录图片或密钥。如果服务不支持图片输入或结构化返回，停在此检查点并报告 Product Lead，不以 mock 通过冒充多模态可用。
+- [ ] 用一张拥有使用权的非私密测试图，从本地 `.env` 调用 `deepseek-flash` 验证图片输入和 JSON 返回；探针最多 3 次，记录模型名、是否返回有效结构、耗时、API 返回的 token 用量与可见线索，不记录图片或密钥。如果服务不支持图片输入或结构化返回，停在此检查点并报告 Product Lead，不以 mock 通过冒充多模态可用。
 - [ ] 运行视觉单测及原文字测试；只提交该任务文件，并报告真实探针结果。`git add` 只列上述文件，提交信息 `feat: add bounded S1 Pro vision observation`。
 
 ### Task 2：新增不破坏旧路径的图文接口
