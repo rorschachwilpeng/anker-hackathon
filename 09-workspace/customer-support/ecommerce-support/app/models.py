@@ -16,6 +16,7 @@ options = dict(mysql_engine='InnoDB', mysql_charset='utf8mb4')
 conversations = Table('conversations', metadata, ident(),
     Column('user_id', String(64), nullable=False),
     Column('status', ENUM('进行中','已转人工','已结束'), nullable=False, server_default='进行中'),
+    Column('task_state', JSON),
     created(), updated(), Index('idx_user_id','user_id'), **options)
 messages = Table('messages', metadata, ident(),
     Column('conversation_id', BIGINT(unsigned=True), ForeignKey('conversations.id',name='fk_messages_conversation'),nullable=False),

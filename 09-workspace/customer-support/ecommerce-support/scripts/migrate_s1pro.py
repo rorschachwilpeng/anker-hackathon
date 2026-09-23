@@ -31,6 +31,10 @@ def migrate():
             with engine.begin() as connection:
                 connection.execute(text(f'ALTER TABLE knowledge_chunks ADD COLUMN {name} {definition}'))
             added.append(name)
+        if 'task_state' not in {column['name'] for column in inspect(engine).get_columns('conversations')}:
+            with engine.begin() as connection:
+                connection.execute(text('ALTER TABLE conversations ADD COLUMN task_state JSON NULL'))
+            added.append('task_state')
     finally:
         engine.dispose()
     return added

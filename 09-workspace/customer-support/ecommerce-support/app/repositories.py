@@ -1,3 +1,5 @@
+from dataclasses import asdict
+import uuid
 from sqlalchemy import select, insert, update
 from sqlalchemy.exc import IntegrityError
 from app.models import conversations, messages, faq, tickets
@@ -46,3 +48,23 @@ class Repository:
                 if not row or any(row[k]!=v for k,v in values.items()):
                     raise ValueError('ticket conflict') from None
         return {**values,'status':'待处理'}
+
+    async def load_s1pro_state(self, conversation_id):
+        from app.s1pro.state import S1ProState
+        async with self.sessions() as session:
+            value=(await session.execute(select(conversations.c.task_state).where(conversations.c.id==conversation_id))).scalar_one()
+        return S1ProState.from_dict(value)
+
+    async def save_s1pro_state(self, conversation_id, state):
+        async with self.sessions.begin() as session:
+            await session.execute(update(conversations).where(conversations.c.id==conversation_id).values(task_state=asdict(state)))
+
+    async def reserve_s1pro_ticket(self, conversation_id):
+        from app.s1pro.state import S1ProState
+        async with self.sessions.begin() as session:
+            value=(await session.execute(select(conversations.c.task_state).where(conversations.c.id==conversation_id).with_for_update())).scalar_one()
+            state=S1ProState.from_dict(value)
+            if state.ticket_no is None:
+                state.ticket_no='T'+uuid.uuid4().hex[:30]
+                await session.execute(update(conversations).where(conversations.c.id==conversation_id).values(task_state=asdict(state)))
+            return state.ticket_no
