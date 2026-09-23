@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     request_timeout: float = Field(default=60.0, gt=0)
     structured_output_method: Literal["json_mode", "json_schema"] = "json_mode"
 
+    vision_base_url: str = "https://api.deepseek.com"
+    vision_model: str = "deepseek-flash"
+    vision_api_key: SecretStr | None = None
+    vision_timeout_seconds: float = Field(default=30.0, gt=0, le=60)
+
     @field_validator("openai_base_url", "openai_model")
     @classmethod
     def reject_blank_text(cls, value: str) -> str:
