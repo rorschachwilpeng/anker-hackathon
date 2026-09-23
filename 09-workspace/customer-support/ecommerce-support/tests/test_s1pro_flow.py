@@ -37,6 +37,16 @@ class Search:
                 {'id':2,'answer':'再检查刷罩胶条和尘盒泡棉密封。','product_model':'T2080','source_title':'Official suction help','source_url':'https://service.eufy.com/a'}]
 
 
+def observation(candidate='T2080', visible_text=None, visible_clues=None, uncertainties=None):
+    from app.s1pro.vision import VisualObservation
+    return VisualObservation(
+        candidate_model=candidate,
+        visible_text=visible_text or ['T2080'],
+        visible_clues=visible_clues or ['robot vacuum label'],
+        uncertainties=uncertainties or [],
+    )
+
+
 async def test_clarify_then_step_feedback_resolution_without_ticket():
     from app.s1pro.flow import S1ProFlow
     repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
@@ -111,3 +121,142 @@ async def test_ticket_failure_does_not_claim_success():
     failure=await flow.handle('可以建单',cid)
     assert failure['action']=='ticket_failed' and failure['ticket_no'] is None
     assert repo.tickets=={}
+
+
+async def test_visual_t2080_candidate_waits_for_confirmation_before_search():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    first=await flow.handle('我的 S1 Pro 不吸了',observation=observation())
+    state=repo.states[first['conversation_id']]
+    assert first['action']=='clarify_product'
+    assert state.confirmed_model is None and state.pending_model_candidate=='T2080'
+    assert search.calls==[]
+
+    confirmed=await flow.handle('是的',first['conversation_id'])
+    assert confirmed['action']=='ask_feedback'
+    assert repo.states[first['conversation_id']].confirmed_model=='T2080'
+    assert search.calls[0][1]=='T2080'
+
+
+async def test_other_visual_candidate_and_yes_cannot_confirm_t2080():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    first=await flow.handle(
+        '我的 S1 Pro 不吸了',
+        observation=observation('other',visible_text=['S1 Pro'],visible_clues=['non-robot appliance']),
+    )
+    assert first['action']=='clarify_product'
+    assert repo.states[first['conversation_id']].pending_model_candidate is None
+    assert search.calls==[]
+
+    answer=await flow.handle('是的',first['conversation_id'])
+    assert answer['action']=='clarify_product'
+    assert repo.states[first['conversation_id']].confirmed_model is None
+    assert search.calls==[]
+
+
+async def test_conflicting_visual_and_explicit_text_never_searches_this_turn():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    first=await flow.handle(
+        'eufy Robot Vacuum Omni S1 Pro 扫地机器人吸力变弱',
+        observation=observation('other',visible_text=['S1 Pro'],visible_clues=['non-robot appliance']),
+    )
+
+    assert first['action']=='clarify_product'
+    assert repo.states[first['conversation_id']].confirmed_model is None
+    assert repo.states[first['conversation_id']].pending_model_candidate is None
+    assert search.calls==[]
+
+
+async def test_image_only_asks_symptom_then_product_before_search():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    first=await flow.handle('',observation=observation())
+    state=repo.states[first['conversation_id']]
+    assert first['action']=='ask_symptom'
+    assert state.awaiting=='symptom'
+    assert state.confirmed_model is None and state.pending_model_candidate=='T2080'
+    assert repo.messages[first['conversation_id']][0]['content']=='[用户上传图片]'
+    assert set(state.visual_observation)=={'candidate_model','visible_text','visible_clues','uncertainties'}
+    assert search.calls==[]
+
+    symptom=await flow.handle('不吸了',first['conversation_id'])
+    assert symptom['action']=='clarify_product'
+    assert search.calls==[]
+
+    confirmed=await flow.handle('是的',first['conversation_id'])
+    assert confirmed['action']=='ask_feedback'
+    assert search.calls[0][1]=='T2080'
+
+
+async def test_image_failure_keeps_text_path_and_previous_state_fields():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    first=await flow.handle('我的 S1 Pro 不吸了',image_failed=True)
+    assert first['action']=='clarify_product'
+    assert '图片暂时没能读出来' in first['reply']
+    assert repo.states[first['conversation_id']].visual_observation is None
+    assert search.calls==[]
+
+    confirmed=await flow.handle('是的',first['conversation_id'])
+    assert confirmed['action']=='ask_feedback'
+    assert search.calls[0][1]=='T2080'
+
+
+async def test_failed_image_without_text_requests_symptom_and_stores_no_image_data():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    result=await flow.handle('',image_failed=True)
+    state=repo.states[result['conversation_id']]
+
+    assert result['action']=='ask_symptom'
+    assert '图片暂时没能读出来' in result['reply']
+    assert '[用户上传图片]' in repo.messages[result['conversation_id']][0]['content']
+    assert state.visual_observation is None and state.pending_model_candidate is None
+    assert search.calls==[]
+
+
+async def test_image_failure_preserves_previous_visual_observation_and_candidate():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    first=await flow.handle('',observation=observation())
+    previous=repo.states[first['conversation_id']].visual_observation.copy()
+    continued=await flow.handle('不吸了',first['conversation_id'],image_failed=True)
+
+    state=repo.states[first['conversation_id']]
+    assert continued['action']=='clarify_product'
+    assert '图片暂时没能读出来' in continued['reply']
+    assert state.visual_observation==previous
+    assert state.pending_model_candidate=='T2080'
+    assert search.calls==[]
+
+
+async def test_ticket_summary_marks_visual_clues_unverified():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    visual=observation(
+        visible_text=['T2080'],
+        visible_clues=['灰色机器人外观'],
+        uncertainties=['无法确认设备当前状态'],
+    )
+
+    first=await flow.handle('我的 S1 Pro 不吸了',observation=visual)
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    created=await flow.handle('可以建单',cid)
+
+    description=repo.tickets[created['ticket_no']]['description']
+    assert '图片提示（未核实）' in description
+    assert '灰色机器人外观' in description
+    assert '无法确认设备当前状态' in description
+    assert 'base64' not in description
