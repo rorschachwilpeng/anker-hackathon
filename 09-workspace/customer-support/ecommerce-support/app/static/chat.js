@@ -3,20 +3,38 @@ const $ = (id) => document.getElementById(id);
 let mode = 'chat';
 let conversationId = null;
 let active = null;
+let selectedImage = null;
+let previewUrl = null;
+let dragDepth = 0;
+const previewUrls = new Set();
 const titles = {chat: '客服对话', extract: '售后提取', s1pro: 'S1 Pro 售后演示'};
 const types = {refund:'退款',return_refund:'退货退款',exchange:'换货',repair:'维修',logistics:'物流问题',other:'其他',unknown:'未说明'};
 function scrollDown() { $('scroll-area').scrollTop = $('scroll-area').scrollHeight; }
-function syncInput() { $('send').disabled = Boolean(active) || !$('message').value.trim(); }
+function syncInput() {
+  const hasImage = mode === 's1pro' && Boolean(selectedImage);
+  $('send').disabled = Boolean(active) || (!$('message').value.trim() && !hasImage);
+  $('add-image').disabled = Boolean(active) || hasImage;
+  $('choose-image').disabled = Boolean(active) || hasImage;
+  $('remove-image').disabled = Boolean(active);
+  $('image-file').disabled = Boolean(active) || mode !== 's1pro';
+}
 function busy(value) {
   $('send').hidden = value; $('stop').hidden = !value;
   for (const id of ['new-chat','chat-mode','extract-mode','s1pro-mode']) $(id).disabled = value;
   $('message').disabled = value; syncInput();
 }
-function addMessage(role, text) {
+function addMessage(role, text, image = null) {
   $('welcome').hidden = true;
   const article = document.createElement('article'); article.className = `message ${role}`;
   const label = document.createElement('div'); label.className = 'speaker'; label.textContent = role === 'user' ? '你' : '知遇 · AI 助手';
-  const bubble = document.createElement('div'); bubble.className = 'bubble'; bubble.textContent = text;
+  const bubble = document.createElement('div'); bubble.className = 'bubble';
+  if (image) {
+    const attachment = document.createElement('div'); attachment.className = 'sent-image';
+    const thumbnail = document.createElement('img'); thumbnail.src = image.url; thumbnail.alt = '本轮已发送的图片';
+    const caption = document.createElement('span'); caption.textContent = '已附一张图片';
+    attachment.append(thumbnail, caption); bubble.append(attachment);
+  }
+  if (text) { const body = document.createElement('div'); body.textContent = text; bubble.append(body); }
   const tools=document.createElement('div'); tools.className='tool-traces';
   article.append(label,tools,bubble); $('messages').append(article); scrollDown();
   return {article,bubble,tools,badges:new Map()};
@@ -26,7 +44,13 @@ function note(view,text,error=false) {
 }
 function reset(next=mode) {
   if(active) return;
+  for (const url of previewUrls) URL.revokeObjectURL(url);
+  previewUrls.clear(); selectedImage=null; previewUrl=null; $('image-file').value='';
+  $('attachment').hidden=true; $('thumbnail').removeAttribute('src'); $('image-feedback').hidden=true;
+  $('image-feedback').textContent=''; $('composer').classList.remove('dragging');
+  $('drop-mask').hidden=true; dragDepth=0; closeImageMenu();
   mode=next; conversationId=null; $('messages').replaceChildren(); $('welcome').hidden=false; $('message').value='';
+  $('image-tools').hidden=mode!=='s1pro';
   $('announcement').textContent='已开始新对话';
   $('page-title').textContent=titles[mode];
   for(const kind of ['chat','extract','s1pro']) {const button=$(kind+'-mode'); button.classList.toggle('selected',kind===mode); if(kind===mode) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');}
@@ -85,29 +109,81 @@ function showS1Pro(data,view) {
   const status=data.action==='ticket_created'?'创建成功':data.action==='ticket_failed'?'创建失败':'待确认';
   note(view,`服务动作：${data.action} · 工单状态：${status}`);
 }
+function closeImageMenu() {
+  $('add-menu').hidden=true;
+  $('add-image').setAttribute('aria-expanded','false');
+}
+function setImageFeedback(message='') {
+  $('image-feedback').textContent=message;
+  $('image-feedback').hidden=!message;
+}
+function showImageDraft(image,url) {
+  selectedImage=image; previewUrl=url; previewUrls.add(url);
+  $('thumbnail').src=url; $('file-name').textContent=image.name||'图片';
+  $('attachment').hidden=false; setImageFeedback(); syncInput();
+}
+function clearImageDraft({revoke=true,clearFeedback=true}={}) {
+  if(previewUrl&&revoke) { URL.revokeObjectURL(previewUrl); previewUrls.delete(previewUrl); }
+  selectedImage=null; previewUrl=null; $('image-file').value='';
+  $('attachment').hidden=true; $('thumbnail').removeAttribute('src'); $('file-name').textContent='';
+  if(clearFeedback) setImageFeedback();
+  syncInput();
+}
+function chooseImage(image) {
+  $('image-file').value='';
+  if(!image||active||mode!=='s1pro') return;
+  setImageFeedback();
+  if(selectedImage) { setImageFeedback('本轮只能添加一张图片，请先移除已选图片。'); return; }
+  if(!['image/png','image/jpeg'].includes(image.type)) { setImageFeedback('仅支持 JPG 或 PNG 图片。'); return; }
+  if(image.size>5*1024*1024) { setImageFeedback('图片不能超过 5 MB，请选择更小的图片。'); return; }
+  showImageDraft(image,URL.createObjectURL(image));
+}
 async function submit(event) {
   event.preventDefault(); if(active) return;
-  const message=$('message').value.trim(); if(!message) return;
+  const message=$('message').value.trim();
+  const submittedMode=mode;
+  const submittedImage=submittedMode==='s1pro'?selectedImage:null;
+  const submittedPreviewUrl=submittedImage?previewUrl:null;
+  if(!message&&!submittedImage) return;
+  closeImageMenu();
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
-  $('announcement').textContent=mode==='chat'?'正在生成回复':'正在提取售后信息';
-  addMessage('user',message); const view=addMessage('assistant',mode==='chat'?'正在思考…':'正在整理…');
+  $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在生成回复':'正在提取售后信息';
+  addMessage('user',message,submittedImage?{url:submittedPreviewUrl}:null);
+  const view=addMessage('assistant',submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在思考…':'正在整理…');
+  if(submittedImage) clearImageDraft({revoke:false});
   let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},150000);
   try {
-    const response=await fetch(mode==='chat'?'/chat':mode==='s1pro'?'/s1pro/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='chat'||mode==='s1pro'?{message,conversation_id:conversationId}:{description:message}),signal:controller.signal});
+    let response;
+    if(submittedImage) {
+      const form=new FormData(); form.append('message',message);
+      if(conversationId!==null) form.append('conversation_id',String(conversationId));
+      form.append('image',submittedImage);
+      response=await fetch('/s1pro/chat/image',{method:'POST',body:form,signal:controller.signal});
+    } else {
+      const payload=submittedMode==='chat'||submittedMode==='s1pro'?{message,conversation_id:conversationId}:{description:message};
+      response=await fetch(submittedMode==='chat'?'/chat':submittedMode==='s1pro'?'/s1pro/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
+    }
     if(!response.ok) {const data=await response.json().catch(()=>({}));throw new Error(typeof data.detail==='string'?data.detail:`请求未成功（${response.status}），请检查输入后重试。`);}
-    if(mode==='chat') {
+    if(submittedMode==='chat') {
       const {answer,reason}=await streamChat(response,view);
       if(reason==='length') note(view,'回复达到长度上限，内容可能不完整；本轮未加入对话记忆。');
 
-    } else if(mode==='s1pro') showS1Pro(await response.json(),view);
+    } else if(submittedMode==='s1pro') showS1Pro(await response.json(),view);
     else showExtraction(await response.json(),view);
     $('announcement').textContent='回复完成';
   } catch(error) {
-    if(view.bubble.textContent==='正在思考…'||view.bubble.textContent==='正在整理…') view.bubble.textContent='';
+    if(['正在思考…','正在整理…','正在识别图片并整理可见线索…'].includes(view.bubble.textContent)) view.bubble.textContent='';
     const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
     for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
     note(view,text+' 已提交的工单不会因停止生成而撤销。',!controller.signal.aborted||timedOut);
-    const retry=document.createElement('button');retry.type='button';retry.className='retry';retry.textContent='重新编辑';retry.onclick=()=>{if(!active){$('message').value=message;syncInput();$('message').focus();}};view.article.append(retry);
+    const retry=document.createElement('button');retry.type='button';retry.className='retry';retry.textContent='重新编辑';retry.onclick=()=>{
+      if(active) return;
+      if(mode!==submittedMode) { note(view,'请切回本轮发送模式后再重新编辑。'); return; }
+      if(submittedImage&&selectedImage&&selectedImage!==submittedImage) { note(view,'请先移除输入区当前图片，再恢复本轮图片。',true); return; }
+      $('message').value=message;
+      if(submittedImage&&!selectedImage) showImageDraft(submittedImage,submittedPreviewUrl);
+      syncInput(); $('message').focus();
+    };view.article.append(retry);
     $('announcement').textContent=text;
   } finally {clearTimeout(timer);active=null;busy(false);$('message').focus();scrollDown();}
 }
@@ -119,6 +195,40 @@ $('new-chat').onclick=()=>reset();
 $('chat-mode').onclick=()=>{if(mode!=='chat')reset('chat');};
 $('extract-mode').onclick=()=>{if(mode!=='extract')reset('extract');};
 $('s1pro-mode').onclick=()=>{if(mode!=='s1pro')reset('s1pro');};
+$('add-image').addEventListener('click',()=>{
+  if(active||selectedImage) return;
+  $('add-menu').hidden=!$('add-menu').hidden;
+  $('add-image').setAttribute('aria-expanded',String(!$('add-menu').hidden));
+});
+$('choose-image').addEventListener('click',()=>{closeImageMenu();$('image-file').click();});
+$('image-file').addEventListener('change',()=>chooseImage($('image-file').files[0]));
+$('remove-image').addEventListener('click',()=>clearImageDraft());
+document.addEventListener('click',(event)=>{if(!event.target.closest('#image-tools')) closeImageMenu();});
+document.addEventListener('keydown',(event)=>{if(event.key==='Escape') closeImageMenu();});
+$('composer').addEventListener('dragenter',(event)=>{
+  if(!event.dataTransfer?.types.includes('Files')) return;
+  event.preventDefault();
+  if(active||mode!=='s1pro') return;
+  dragDepth++; $('composer').classList.add('dragging'); $('drop-mask').hidden=false;
+});
+$('composer').addEventListener('dragover',(event)=>{
+  if(!event.dataTransfer?.types.includes('Files')) return;
+  event.preventDefault();
+  if(!active&&mode==='s1pro') event.dataTransfer.dropEffect='copy';
+});
+$('composer').addEventListener('dragleave',(event)=>{
+  if(!event.dataTransfer?.types.includes('Files')||active||mode!=='s1pro') return;
+  event.preventDefault();
+  dragDepth=Math.max(0,dragDepth-1);
+  if(dragDepth===0) { $('composer').classList.remove('dragging'); $('drop-mask').hidden=true; }
+});
+$('composer').addEventListener('drop',(event)=>{
+  if(!event.dataTransfer?.files.length) return;
+  event.preventDefault(); dragDepth=0; $('composer').classList.remove('dragging'); $('drop-mask').hidden=true;
+  if(active||mode!=='s1pro') return;
+  if(event.dataTransfer.files.length!==1) { setImageFeedback('本轮只能添加一张图片。'); return; }
+  chooseImage(event.dataTransfer.files[0]);
+});
 for(const button of document.querySelectorAll('[data-prompt]')) button.onclick=()=>{$('message').value=button.dataset.prompt;syncInput();$('message').focus();};
 fetch('/health').then(r=>{if(!r.ok)throw new Error();$('connection').textContent='服务已连接';$('connection').classList.add('online');}).catch(()=>{$('connection').textContent='服务未连接';});
 

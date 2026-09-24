@@ -38,9 +38,28 @@
     </section>
     <div class="composer-area">
       <form id="composer" class="composer">
+        <div class="drop-mask" id="drop-mask" hidden><div>松开以添加图片<small>仅支持一张 JPG 或 PNG，最大 5 MB</small></div></div>
+        <div class="attachment" id="attachment" hidden>
+          <img id="thumbnail" alt="待发送图片预览">
+          <div class="attachment-info"><strong id="file-name"></strong><small>未发送 · 仅本轮使用</small></div>
+          <button class="remove" id="remove-image" type="button" aria-label="移除图片">×</button>
+        </div>
+        <div class="feedback" id="image-feedback" role="alert" hidden></div>
         <label class="sr-only" for="message">输入消息</label>
         <textarea id="message" rows="2" maxlength="16000" placeholder="说说你的问题，我来帮你一起解决…"></textarea>
-        <div class="composer-bottom"><span id="input-hint">Enter 发送 · Shift + Enter 换行</span><button id="send" type="submit" disabled aria-label="发送消息">发送 <span aria-hidden="true">↑</span></button><button id="stop" type="button" hidden>停止生成 <span aria-hidden="true">■</span></button></div>
+        <div class="composer-bottom">
+          <div class="add-wrap" id="image-tools" hidden>
+            <button class="add-button" id="add-image" type="button" aria-label="添加图片" aria-expanded="false" aria-controls="add-menu">＋</button>
+            <div class="add-menu" id="add-menu" hidden>
+              <div class="add-menu-title">添加</div>
+              <button class="upload-option" id="choose-image" type="button"><span class="folder-icon" aria-hidden="true"></span>上传图片</button>
+            </div>
+          </div>
+          <span id="input-hint">Enter 发送 · Shift + Enter 换行</span>
+          <button id="send" type="submit" disabled aria-label="发送消息">发送 <span aria-hidden="true">↑</span></button>
+          <button id="stop" type="button" hidden>停止生成 <span aria-hidden="true">■</span></button>
+        </div>
+        <input id="image-file" class="sr-only" type="file" accept="image/png,image/jpeg" aria-label="选择图片">
       </form>
       <div class="footnote">AI 回复仅供参考，实际售后处理请以商家确认为准。</div>
       <div class="sr-only" id="announcement" role="status"></div>
