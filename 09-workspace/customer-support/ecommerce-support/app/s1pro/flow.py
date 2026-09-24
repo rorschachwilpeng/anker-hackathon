@@ -69,12 +69,7 @@ class S1ProFlow:
             return {'conversation_id':conversation_id,'action':action,'reply':reply,
                     'source':source,'ticket_no':ticket_no,'tool_calls':tool_calls}
 
-        if state.ticket_no and state.awaiting is None:
-            return await respond('ticket_created',f'工单 {state.ticket_no} 已创建，请等待人工跟进。',ticket_no=state.ticket_no)
-
-        if state.awaiting=='ticket_confirmation':
-            if not _explicit_consent(message):
-                return await respond('confirm_ticket','需要人工跟进吗？如同意，请明确回复“可以建单”。')
+        async def create_ticket():
             number=await self.repo.reserve_s1pro_ticket(conversation_id)
             state.ticket_no=number
             history=await self.repo.load_messages(conversation_id)
@@ -100,6 +95,21 @@ class S1ProFlow:
             state.awaiting=None
             return await respond('ticket_created',f'已创建售后工单 {number}，人工可查看排障摘要。',ticket_no=number)
 
+        if state.ticket_no and state.awaiting is None:
+            return await respond('ticket_created',f'工单 {state.ticket_no} 已创建，请等待人工跟进。',ticket_no=state.ticket_no)
+
+        if state.awaiting=='ticket_confirmation':
+            consent=_explicit_consent(message)
+            if not consent and message.strip():
+                try:
+                    understood=await self.understanding.interpret(message,state)
+                except Exception:
+                    return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
+                consent=understood.get('ticket_consent') is True
+            if not consent:
+                return await respond('confirm_ticket','需要人工跟进吗？如同意，请明确回复“可以建单”。')
+            return await create_ticket()
+
         affirmative_confirmation=(
             state.awaiting=='product'
             and state.pending_model_candidate=='T2080'
@@ -123,6 +133,14 @@ class S1ProFlow:
                 'T2080' if observation is not None and observation.candidate_model=='T2080' else None
             )
             state.awaiting='symptom'
+            if observation is not None and observation.candidate_model=='T2080':
+                seen='、'.join((observation.visible_text+observation.visible_clues)[:3])
+                if seen:
+                    return await respond(
+                        'ask_symptom',
+                        f'照片里能看到「{seen}」，像是 eufy S1 Pro（T2080）扫地机器人。'
+                        '如果是这款产品，请回复确认；另外请告诉我遇到了什么故障现象。',
+                    )
             return await respond('ask_symptom','请用文字告诉我产品型号和遇到的故障现象。')
 
         explicit_product=_explicit_product(message)
@@ -176,20 +194,31 @@ class S1ProFlow:
             state.pending_model_candidate=None
             state.awaiting=None
 
+        if state.awaiting is None and state.ticket_no is None and understood.get('ticket_consent'):
+            return await create_ticket()
+
         if state.symptom is None:
             state.symptom=understood.get('symptom_candidate')
         if state.symptom is None and (state.visual_observation is not None or had_awaiting_symptom):
             state.awaiting='symptom'
             return await respond('ask_symptom','请告诉我目前遇到的故障现象。')
         if state.symptom!='吸力变弱':
-            state.awaiting='ticket_confirmation'
-            return await respond('no_answer','目前没有可核实的对应排障步骤，不能凭其他问题的资料指导操作。如需人工跟进，请回复“可以建单”。')
+            state.awaiting=None
+            return await respond(
+                'no_answer',
+                '我目前只核实了“吸力变弱”这一类问题的官方排障资料，您描述的情况没有可靠依据，不能凭猜测指导操作。'
+                '您可以补充说明故障现象或拍照给我看；也可以按官方指引准备信息联系 eufy 支持（见下方链接）；'
+                '需要我创建工单交给人工跟进的话，回复“可以建单”。',
+                source={'title':'eufy：解决技术问题需要提供的信息',
+                        'url':'https://service.eufy.com/eu/article-description/What-information-does-eufy-need-to-resolve-a-technical-issue-with-my-S1-Pro'},
+            )
 
         if state.awaiting=='feedback':
-            if understood.get('feedback')=='resolved' and any(word in message for word in ('好了','恢复','正常','解决')):
+            feedback=understood.get('feedback')
+            if feedback=='resolved' or (feedback is None and any(word in message for word in ('好了','恢复','正常','解决'))):
                 state.feedback='已恢复正常';state.awaiting=None
                 return await respond('resolved','很高兴吸力已恢复。本次排查已记录，无需创建工单。')
-            if understood.get('feedback')!='unresolved' or not any(word in message for word in ('不行','没用','无效','仍然','还是')):
+            if feedback!='unresolved' and not any(word in message for word in ('不行','没用','无效','仍然','还是')):
                 return await respond('ask_feedback','请告诉我刚才的步骤是否让吸力恢复？')
             state.feedback=message
             if state.suggested_steps:

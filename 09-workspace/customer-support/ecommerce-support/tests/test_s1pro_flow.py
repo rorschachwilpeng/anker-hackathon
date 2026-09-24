@@ -99,12 +99,124 @@ async def test_unresolved_steps_require_confirmation_and_reuse_ticket():
     assert again['ticket_no']=='Tfixed' and len(repo.tickets)==1
 
 
+async def test_natural_consent_creates_ticket_via_understanding():
+    from app.s1pro.flow import S1ProFlow
+    class ConsentUnderstanding(Understanding):
+        async def interpret(self,message,state):
+            result=await super().interpret(message,state)
+            result['ticket_consent']=('建' in message) or ('可以' in message)
+            return result
+    repo=Repo();flow=S1ProFlow(repo,ConsentUnderstanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    created=await flow.handle('好的，建吧',cid)
+    assert created['action']=='ticket_created' and created['ticket_no']=='Tfixed'
+    assert '吸力变弱' in repo.tickets['Tfixed']['description']
+
+
+async def test_ambiguous_reply_during_ticket_confirmation_creates_no_ticket():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    vague=await flow.handle('嗯',cid)
+    assert vague['action']=='confirm_ticket' and repo.tickets=={}
+    assert repo.states[cid].ticket_no is None
+
+
+async def test_ticket_consent_understanding_failure_degrades_without_ticket():
+    from app.s1pro.flow import S1ProFlow
+    class UnavailableUnderstanding:
+        async def interpret(self,message,state):
+            raise RuntimeError('model unavailable')
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    flow.understanding=UnavailableUnderstanding()
+    degraded=await flow.handle('好的，建吧',cid)
+    assert degraded['action']=='degraded' and repo.tickets=={}
+    assert repo.states[cid].ticket_no is None
+
+
 async def test_unrelated_issue_does_not_get_suction_steps_or_search():
     from app.s1pro.flow import S1ProFlow
     repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
     first=await flow.handle('eufy 扫地机器人 S1 Pro 无法充电')
-    assert first['action']=='no_answer' and first['source'] is None
+    assert first['action']=='no_answer'
     assert first['tool_calls']==0 and search.calls==[] and repo.tickets=={}
+    assert first['source']['url'].endswith('What-information-does-eufy-need-to-resolve-a-technical-issue-with-my-S1-Pro')
+    assert repo.states[first['conversation_id']].awaiting is None
+
+
+async def test_after_no_answer_user_can_redescribe_suction_symptom():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+    first=await flow.handle('eufy 扫地机器人 S1 Pro 无法充电')
+    assert first['action']=='no_answer'
+    retry=await flow.handle('其实是吸力变弱了，不吸了',first['conversation_id'])
+    assert retry['action']=='ask_feedback'
+    assert search.calls and search.calls[0][1]=='T2080'
+    assert retry['source']['url']=='https://service.eufy.com/a'
+
+
+async def test_after_no_answer_consent_creates_ticket():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('eufy 扫地机器人 S1 Pro 无法充电')
+    assert first['action']=='no_answer'
+    created=await flow.handle('可以建单',first['conversation_id'])
+    assert created['action']=='ticket_created' and created['ticket_no']=='Tfixed'
+    assert '待确认' in repo.tickets['Tfixed']['description']
+    again=await flow.handle('可以建单',first['conversation_id'])
+    assert again['ticket_no']=='Tfixed' and len(repo.tickets)==1
+
+
+async def test_no_consent_without_confirmation_after_no_answer():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('eufy 扫地机器人 S1 Pro 无法充电')
+    assert first['action']=='no_answer' and repo.tickets=={}
+
+
+async def test_unresolved_without_keywords_advances_to_next_step():
+    from app.s1pro.flow import S1ProFlow
+    class NuancedUnderstanding(Understanding):
+        async def interpret(self,message,state):
+            result=await super().interpret(message,state)
+            if '没什么变化' in message:result['feedback']='unresolved'
+            return result
+    repo=Repo();flow=S1ProFlow(repo,NuancedUnderstanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    follow=await flow.handle('试过了，没什么变化',cid)
+    assert follow['action']=='ask_feedback'
+    assert '胶条' in follow['reply']
+    assert follow['reply']!='请告诉我刚才的步骤是否让吸力恢复？'
+
+
+async def test_resolved_via_model_without_keywords():
+    from app.s1pro.flow import S1ProFlow
+    class ResolvedUnderstanding(Understanding):
+        async def interpret(self,message,state):
+            result=await super().interpret(message,state)
+            if '搞定' in message:result['feedback']='resolved'
+            return result
+    repo=Repo();flow=S1ProFlow(repo,ResolvedUnderstanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    done=await flow.handle('搞定了',cid)
+    assert done['action']=='resolved' and repo.tickets=={}
 
 
 async def test_ticket_failure_does_not_claim_success():
@@ -240,6 +352,27 @@ async def test_image_only_asks_symptom_then_product_before_search():
     confirmed=await flow.handle('是的',first['conversation_id'])
     assert confirmed['action']=='ask_feedback'
     assert search.calls[0][1]=='T2080'
+
+
+async def test_image_only_reply_references_visible_clues():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+    first=await flow.handle('',observation=observation(visible_text=['Model: T2080','S1 Pro'],visible_clues=['robot vacuum label']))
+    assert first['action']=='ask_symptom'
+    assert 'Model: T2080' in first['reply'] and '像是' in first['reply']
+    assert '已识别' not in first['reply']
+    state=repo.states[first['conversation_id']]
+    assert state.pending_model_candidate=='T2080' and state.confirmed_model is None
+    assert search.calls==[]
+
+
+async def test_image_only_unknown_candidate_keeps_generic_symptom_request():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+    first=await flow.handle('',observation=observation('unknown',visible_text=['模糊文字'],visible_clues=['无法辨认']))
+    assert first['action']=='ask_symptom'
+    assert first['reply']=='请用文字告诉我产品型号和遇到的故障现象。'
+    assert search.calls==[]
 
 
 async def test_image_failure_keeps_text_path_and_previous_state_fields():
