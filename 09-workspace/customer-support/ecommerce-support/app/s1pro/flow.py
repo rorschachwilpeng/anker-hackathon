@@ -1,3 +1,5 @@
+import re
+
 from app.tools.business import build_s1pro_tools
 from app.tools.executor import ToolExecutor
 from app.s1pro.vision import VisualObservation
@@ -14,6 +16,17 @@ def _explicit_consent(message):
 
 def _affirm_product(message):
     return message.strip('。！!，, ').casefold() in ('是的', '对', '对的', '是', '确认', '没错', 'yes')
+
+
+def _visual_conflicts_with_t2080(observation):
+    if observation.candidate_model == 'other':
+        return True
+    visible_content=' '.join(observation.visible_text+observation.visible_clues).casefold()
+    if any(term in visible_content for term in ('camera','摄像头','doorbell','门铃','not a vacuum','非扫地机器人')):
+        return True
+    model_codes=re.findall(r'\bmodel(?:\s*(?:number|no\.?))?\s*[:#]?\s*([a-z0-9-]+)',visible_content)
+    target_models={'t2080','s1','s1-pro','s1pro'}
+    return any(code.casefold() not in target_models for code in model_codes)
 
 
 class S1ProFlow:
@@ -114,10 +127,11 @@ class S1ProFlow:
 
         explicit_product=_explicit_product(message)
         text_candidate=understood.get('product_candidate')
+        visual_conflict=_visual_conflicts_with_t2080(observation) if observation is not None else False
         image_conflict=(
             observation is not None
             and (
-                (observation.candidate_model=='other' and explicit_product)
+                (visual_conflict and explicit_product)
                 or (observation.candidate_model=='T2080' and text_candidate not in (None,'T2080'))
             )
         )
@@ -130,7 +144,7 @@ class S1ProFlow:
                 '图片线索与文字描述不一致，请用文字完整确认产品型号；确认前我不会查询型号专属排障资料。',
             )
 
-        if observation is not None and observation.candidate_model=='other':
+        if observation is not None and visual_conflict:
             state.confirmed_model=None
             state.pending_model_candidate=None
             state.awaiting='product'
@@ -148,11 +162,13 @@ class S1ProFlow:
             if not (explicit_product or affirmative_confirmation):
                 if state.pending_model_candidate is None:
                     previous_candidate=(state.visual_observation or {}).get('candidate_model')
-                    if previous_candidate!='other':
+                    if state.visual_observation is None or previous_candidate=='T2080':
                         state.pending_model_candidate='T2080'
                 state.awaiting='product'
                 if state.pending_model_candidate=='T2080':
                     reply='请确认：您说的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人吗？'
+                elif state.visual_observation and state.visual_observation.get('candidate_model')=='unknown':
+                    reply='图片无法可靠确认产品型号，请补拍清晰标签或用文字说明完整产品型号和类型；确认前我不会查询型号专属排障资料。'
                 else:
                     reply='请用文字说明完整产品型号和类型；确认前我不会查询型号专属排障资料。'
                 return await respond('clarify_product',reply)

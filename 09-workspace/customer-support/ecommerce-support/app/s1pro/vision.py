@@ -47,8 +47,11 @@ class VisionClient:
                 {
                     "role": "system",
                     "content": (
-                        "Inspect only what is visibly present in the image. Do not infer an internal fault "
-                        "or treat a product candidate as confirmed. Return json matching this example: "
+                    "Inspect only what is visibly present in the image. Do not infer an internal fault "
+                    "or treat a product candidate as confirmed. Use T2080 only when visible text identifies "
+                    "model T2080 or S1 Pro as a robot vacuum. Use other when the visible text identifies a "
+                    "different product category or model; use unknown when the model/category is unreadable. "
+                    "Return json matching this example: "
                         '{"candidate_model":"unknown","visible_text":[],"visible_clues":[],"uncertainties":[]}. '
                         'candidate_model must be "T2080", "other", or "unknown".'
                     ),

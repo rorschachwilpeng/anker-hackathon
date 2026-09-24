@@ -139,6 +139,21 @@ async def test_visual_t2080_candidate_waits_for_confirmation_before_search():
     assert search.calls[0][1]=='T2080'
 
 
+async def test_s1_pro_alias_in_visible_model_code_is_not_a_conflict():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+
+    first=await flow.handle(
+        '我的 S1 Pro 不吸了',
+        observation=observation('T2080',visible_text=['Model: S1 Pro'],visible_clues=['robot vacuum label']),
+    )
+
+    assert first['action']=='clarify_product'
+    assert first['reply']=='请确认：您说的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人吗？'
+    assert repo.states[first['conversation_id']].pending_model_candidate=='T2080'
+    assert search.calls==[]
+
+
 async def test_other_visual_candidate_and_yes_cannot_confirm_t2080():
     from app.s1pro.flow import S1ProFlow
     repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
@@ -169,6 +184,39 @@ async def test_conflicting_visual_and_explicit_text_never_searches_this_turn():
     assert first['action']=='clarify_product'
     assert repo.states[first['conversation_id']].confirmed_model is None
     assert repo.states[first['conversation_id']].pending_model_candidate is None
+    assert search.calls==[]
+
+
+async def test_visible_non_target_product_clues_conflict_with_explicit_target_text():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+    visual=observation(
+        'unknown',
+        visible_text=['eufy SECURITY','Indoor Camera','Model: S330','NOT A VACUUM'],
+        visible_clues=['security camera product label','model S330'],
+    )
+
+    first=await flow.handle('eufy Robot Vacuum Omni S1 Pro 扫地机器人不吸了',observation=visual)
+    state=repo.states[first['conversation_id']]
+
+    assert first['action']=='clarify_product'
+    assert state.confirmed_model is None
+    assert state.pending_model_candidate is None
+    assert search.calls==[]
+
+
+async def test_unknown_visual_candidate_is_not_presented_as_t2080():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
+    visual=observation('unknown',visible_text=['模糊文字'],visible_clues=['型号无法辨认'])
+
+    first=await flow.handle('我的 S1 Pro 不吸了',observation=visual)
+    state=repo.states[first['conversation_id']]
+
+    assert first['action']=='clarify_product'
+    assert '无法可靠确认' in first['reply']
+    assert '请确认：您说的是 eufy Robot Vacuum Omni S1 Pro' not in first['reply']
+    assert state.confirmed_model is None and state.pending_model_candidate is None
     assert search.calls==[]
 
 
