@@ -39,6 +39,7 @@ async def initialize(db):
                     validate_column_defaults(table.name,column.name,actual)
                     expected_type=str(column.type.compile(dialect=c.dialect)).lower()
                     actual_type=str(actual['type'].compile(dialect=c.dialect)).lower()
+                    if expected_type.startswith('numeric('):expected_type=expected_type.replace('numeric(', 'decimal(', 1)
                     if actual_type!=expected_type or actual['nullable']!=column.nullable:
                         raise RuntimeError('schema type mismatch: '+table.name+'.'+column.name)
                 if set(inspector.get_pk_constraint(table.name)['constrained_columns']) != {x.name for x in table.primary_key}:
