@@ -201,7 +201,7 @@ async def test_unresolved_without_keywords_advances_to_next_step():
     follow=await flow.handle('试过了，没什么变化',cid)
     assert follow['action']=='ask_feedback'
     assert '胶条' in follow['reply']
-    assert follow['reply']!='请告诉我刚才的步骤是否让吸力恢复？'
+    assert follow['reply']!='试过之后怎么样，吸力回来点了吗？'
 
 
 async def test_resolved_via_model_without_keywords():
@@ -261,7 +261,7 @@ async def test_s1_pro_alias_in_visible_model_code_is_not_a_conflict():
     )
 
     assert first['action']=='clarify_product'
-    assert first['reply']=='请确认：您说的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人吗？'
+    assert first['reply']=='好，这个问题我来帮您查。先对一下：您用的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人，对吗？'
     assert repo.states[first['conversation_id']].pending_model_candidate=='T2080'
     assert search.calls==[]
 
@@ -326,7 +326,7 @@ async def test_unknown_visual_candidate_is_not_presented_as_t2080():
     state=repo.states[first['conversation_id']]
 
     assert first['action']=='clarify_product'
-    assert '无法可靠确认' in first['reply']
+    assert '没能让我确认' in first['reply']
     assert '请确认：您说的是 eufy Robot Vacuum Omni S1 Pro' not in first['reply']
     assert state.confirmed_model is None and state.pending_model_candidate is None
     assert search.calls==[]
@@ -373,9 +373,9 @@ async def test_progress_field_tracks_state_sources_and_ticket():
     created=await flow.handle('可以建单',cid)
     assert created['progress']['ticket_no']=='Tfixed'
     assert created['ticket_url']=='/s1pro/tickets/Tfixed'
-    assert '本地演示记录' in created['reply']
+    assert '不会真的提交给安克客服' in created['reply']
     again=await flow.handle('可以建单',cid)
-    assert '本地演示记录' in again['reply'] and again['ticket_url']=='/s1pro/tickets/Tfixed'
+    assert '不会真的提交给安克客服' in again['reply'] and again['ticket_url']=='/s1pro/tickets/Tfixed'
 
 
 async def test_resolved_includes_maintenance_advice_and_source():
@@ -386,7 +386,7 @@ async def test_resolved_includes_maintenance_advice_and_source():
     await flow.handle('是的',cid)
     done=await flow.handle('清理后好了',cid)
     assert done['action']=='resolved'
-    assert '复发' in done['reply'] and '吸力又不行了' in done['reply']
+    assert '不会再犯' in done['reply'] and '吸力又不行了' in done['reply']
     assert done['source']['url']=='https://service.eufy.com/a'
     assert done['progress']['product']=='eufy S1 Pro (T2080)'
     assert repo.tickets=={}
@@ -409,7 +409,7 @@ async def test_image_only_unknown_candidate_keeps_generic_symptom_request():
     repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
     first=await flow.handle('',observation=observation('unknown',visible_text=['模糊文字'],visible_clues=['无法辨认']))
     assert first['action']=='ask_symptom'
-    assert first['reply']=='请用文字告诉我产品型号和遇到的故障现象。'
+    assert first['reply']=='告诉我产品型号和它现在的问题，我来帮您想办法。'
     assert search.calls==[]
 
 
@@ -419,8 +419,8 @@ async def test_image_failure_keeps_text_path_and_previous_state_fields():
 
     first=await flow.handle('我的 S1 Pro 不吸了',image_failed=True)
     assert first['action']=='clarify_product'
-    assert '图片暂时没能读出来' in first['notice']
-    assert '图片暂时没能读出来' not in first['reply']
+    assert '这张照片我没太看清' in first['notice']
+    assert '这张照片我没太看清' not in first['reply']
     assert repo.states[first['conversation_id']].visual_observation is None
     assert search.calls==[]
 
@@ -437,8 +437,8 @@ async def test_failed_image_without_text_requests_symptom_and_stores_no_image_da
     state=repo.states[result['conversation_id']]
 
     assert result['action']=='ask_symptom'
-    assert '图片暂时没能读出来' in result['notice']
-    assert '图片暂时没能读出来' not in result['reply']
+    assert '这张照片我没太看清' in result['notice']
+    assert '这张照片我没太看清' not in result['reply']
     assert '[用户上传图片]' in repo.messages[result['conversation_id']][0]['content']
     assert state.visual_observation is None and state.pending_model_candidate is None
     assert search.calls==[]
@@ -454,8 +454,8 @@ async def test_image_failure_preserves_previous_visual_observation_and_candidate
 
     state=repo.states[first['conversation_id']]
     assert continued['action']=='clarify_product'
-    assert '图片暂时没能读出来' in continued['notice']
-    assert '图片暂时没能读出来' not in continued['reply']
+    assert '这张照片我没太看清' in continued['notice']
+    assert '这张照片我没太看清' not in continued['reply']
     assert state.visual_observation==previous
     assert state.pending_model_candidate=='T2080'
     assert search.calls==[]
@@ -497,11 +497,11 @@ async def test_urgent_message_is_acknowledged_and_tracked():
     repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
     first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了，明天请客急着用')
     assert first['action']=='ask_feedback'
-    assert first['reply'].startswith('明白您着急，这点我已记录；')
+    assert first['reply'].startswith('知道您着急，我尽量少让您走弯路。')
     assert first['progress']['urgent'] is True
     cid=first['conversation_id']
     followup=await flow.handle('还是不行',cid)
-    assert not followup['reply'].startswith('明白您着急')
+    assert not followup['reply'].startswith('知道您着急')
     assert followup['progress']['urgent'] is True
     assert repo.states[cid].urgent is True
 
@@ -523,7 +523,7 @@ async def test_non_urgent_message_has_no_urgent_marker():
     repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
     first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
     assert first['action']=='ask_feedback'
-    assert not first['reply'].startswith('明白您着急')
+    assert not first['reply'].startswith('知道您着急')
     assert first['progress']['urgent'] is False
 
 
@@ -563,7 +563,7 @@ async def test_human_request_goes_straight_to_ticket_confirmation():
     cid=first['conversation_id']
     ask=await flow.handle('别折腾了，我要找人工客服',cid)
     assert ask['action']=='confirm_ticket'
-    assert '转人工' in ask['reply'] and '本地演示记录' in ask['reply']
+    assert '转人工' in ask['reply'] and '不会真的提交给安克客服' in ask['reply']
     created=await flow.handle('可以建单',cid)
     assert created['action']=='ticket_created'
 

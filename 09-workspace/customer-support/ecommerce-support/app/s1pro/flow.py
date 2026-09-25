@@ -2,6 +2,7 @@ import re
 
 from app.tools.business import build_s1pro_tools
 from app.tools.executor import ToolExecutor
+from app.s1pro import messages as copy
 from app.s1pro.vision import VisualObservation
 
 
@@ -64,7 +65,7 @@ class S1ProFlow:
                 'uncertainties':list(observation.uncertainties),
             }
         tool_calls=0
-        image_failure_notice='图片暂时没能读出来，先按文字继续。' if image_failed else ''
+        image_failure_notice=copy.IMAGE_FAILURE_NOTICE if image_failed else ''
         urgent_notice=''
 
         async def respond(action,reply,source=None,ticket_no=None,ticket_url=None):
@@ -89,7 +90,7 @@ class S1ProFlow:
             nonlocal urgent_notice
             if understood.get('urgency')=='urgent' and not state.urgent:
                 state.urgent=True
-                urgent_notice='明白您着急，这点我已记录；'
+                urgent_notice=copy.URGENT_NOTICE
 
         async def create_ticket():
             number=await self.repo.reserve_s1pro_ticket(conversation_id)
@@ -114,15 +115,13 @@ class S1ProFlow:
             try:
                 await self.repo.create_ticket_once(number,conversation_id,description[:2000],'售后')
             except Exception:
-                return await respond('ticket_failed','工单尚未创建成功，请稍后重试；已保留当前排障信息。')
+                return await respond('ticket_failed',copy.TICKET_FAILED)
             state.awaiting=None
-            return await respond('ticket_created',
-                                 f'已创建售后工单 {number}（本地演示记录，未提交给安克客服），排障摘要已随单保存。',
+            return await respond('ticket_created',copy.ticket_created(number),
                                  ticket_no=number,ticket_url=f'/s1pro/tickets/{number}')
 
         if state.ticket_no and state.awaiting is None:
-            return await respond('ticket_created',
-                                 f'工单 {state.ticket_no} 已创建（本地演示记录），请等待人工跟进。',
+            return await respond('ticket_created',copy.ticket_terminal(state.ticket_no),
                                  ticket_no=state.ticket_no,ticket_url=f'/s1pro/tickets/{state.ticket_no}')
 
         if state.awaiting=='ticket_confirmation':
@@ -132,11 +131,11 @@ class S1ProFlow:
                 try:
                     understood=await self.understanding.interpret(message,state)
                 except Exception:
-                    return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
+                    return await respond('degraded',copy.DEGRADED_UNDERSTANDING)
                 capture_urgency(understood)
                 consent=understood.get('ticket_consent') is True or understood.get('human_request') is True
             if not consent:
-                return await respond('confirm_ticket','需要人工跟进吗？如同意，请明确回复“可以建单”。')
+                return await respond('confirm_ticket',copy.CONFIRM_TICKET_ASK)
             return await create_ticket()
 
         affirmative_confirmation=(
@@ -151,7 +150,7 @@ class S1ProFlow:
             try:
                 understood=await self.understanding.interpret(message,state)
             except Exception:
-                return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
+                return await respond('degraded',copy.DEGRADED_UNDERSTANDING)
             capture_urgency(understood)
         else:
             understood={}
@@ -167,12 +166,8 @@ class S1ProFlow:
             if observation is not None and observation.candidate_model=='T2080':
                 seen='、'.join((observation.visible_text+observation.visible_clues)[:3])
                 if seen:
-                    return await respond(
-                        'ask_symptom',
-                        f'照片里能看到「{seen}」，像是 eufy S1 Pro（T2080）扫地机器人。'
-                        '如果是这款产品，请回复确认；另外请告诉我遇到了什么故障现象。',
-                    )
-            return await respond('ask_symptom','请用文字告诉我产品型号和遇到的故障现象。')
+                    return await respond('ask_symptom',copy.ask_symptom_with_clues(seen))
+            return await respond('ask_symptom',copy.ASK_SYMPTOM_IMAGE_ONLY)
 
         explicit_product=_explicit_product(message)
         text_candidate=understood.get('product_candidate')
@@ -188,19 +183,13 @@ class S1ProFlow:
             state.confirmed_model=None
             state.pending_model_candidate=None
             state.awaiting='product'
-            return await respond(
-                'clarify_product',
-                '图片线索与文字描述不一致，请用文字完整确认产品型号；确认前我不会查询型号专属排障资料。',
-            )
+            return await respond('clarify_product',copy.CLARIFY_PRODUCT_IMAGE_TEXT_CONFLICT)
 
         if observation is not None and visual_conflict:
             state.confirmed_model=None
             state.pending_model_candidate=None
             state.awaiting='product'
-            return await respond(
-                'clarify_product',
-                '我无法从图片确认这是目标扫地机器人，请用文字说明完整产品型号；确认前我不会查询型号专属排障资料。',
-            )
+            return await respond('clarify_product',copy.CLARIFY_PRODUCT_IMAGE_NOT_TARGET)
 
         if observation is not None and observation.candidate_model=='T2080' and state.confirmed_model is None:
             state.pending_model_candidate='T2080'
@@ -215,11 +204,11 @@ class S1ProFlow:
                         state.pending_model_candidate='T2080'
                 state.awaiting='product'
                 if state.pending_model_candidate=='T2080':
-                    reply='请确认：您说的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人吗？'
+                    reply=copy.CLARIFY_PRODUCT_T2080
                 elif state.visual_observation and state.visual_observation.get('candidate_model')=='unknown':
-                    reply='图片无法可靠确认产品型号，请补拍清晰标签或用文字说明完整产品型号和类型；确认前我不会查询型号专属排障资料。'
+                    reply=copy.CLARIFY_PRODUCT_IMAGE_UNKNOWN
                 else:
-                    reply='请用文字说明完整产品型号和类型；确认前我不会查询型号专属排障资料。'
+                    reply=copy.CLARIFY_PRODUCT_GENERIC
                 return await respond('clarify_product',reply)
             state.confirmed_model='T2080'
             state.pending_model_candidate=None
@@ -227,9 +216,7 @@ class S1ProFlow:
 
         if state.ticket_no is None and understood.get('human_request'):
             state.awaiting='ticket_confirmation'
-            return await respond('confirm_ticket',
-                                 '好的，可以为您转人工跟进。本演示中“转人工”通过创建工单实现（本地演示记录，未提交给安克客服）。'
-                                 '如同意，请明确回复“可以建单”。')
+            return await respond('confirm_ticket',copy.CONFIRM_TICKET_HUMAN_REQUEST)
 
         if state.awaiting is None and state.ticket_no is None and understood.get('ticket_consent'):
             return await create_ticket()
@@ -238,14 +225,11 @@ class S1ProFlow:
             state.symptom=understood.get('symptom_candidate')
         if state.symptom is None and (state.visual_observation is not None or had_awaiting_symptom):
             state.awaiting='symptom'
-            return await respond('ask_symptom','请告诉我目前遇到的故障现象。')
+            return await respond('ask_symptom',copy.ASK_SYMPTOM)
         if state.symptom!='吸力变弱':
             state.awaiting=None
             return await respond(
-                'no_answer',
-                '我目前只核实了“吸力变弱”这一类问题的官方排障资料，您描述的情况没有可靠依据，不能凭猜测指导操作。'
-                '您可以补充说明故障现象或拍照给我看；也可以按官方指引准备信息联系 eufy 支持（见下方链接）；'
-                '需要我创建工单交给人工跟进的话，回复“可以建单”。',
+                'no_answer',copy.NO_ANSWER,
                 source={'title':'eufy：解决技术问题需要提供的信息',
                         'url':'https://service.eufy.com/eu/article-description/What-information-does-eufy-need-to-resolve-a-technical-issue-with-my-S1-Pro'},
             )
@@ -254,12 +238,10 @@ class S1ProFlow:
             feedback=understood.get('feedback')
             if feedback=='resolved' or (feedback is None and any(word in message for word in ('好了','恢复','正常','解决'))):
                 state.feedback='已恢复正常';state.awaiting=None
-                return await respond('resolved',
-                                     '很高兴吸力恢复正常。建议每 1-2 周清理一次滚刷、尘盒和过滤器，可以减少复发（依据见下方来源）。'
-                                     '如果问题再次出现，直接告诉我"吸力又不行了"，我们会接着这次的记录继续。',
+                return await respond('resolved',copy.RESOLVED,
                                      source=state.sources[-1] if state.sources else None)
             if feedback!='unresolved' and not any(word in message for word in ('不行','没用','无效','仍然','还是')):
-                return await respond('ask_feedback','请告诉我刚才的步骤是否让吸力恢复？')
+                return await respond('ask_feedback',copy.ASK_FEEDBACK_RETRY)
             state.feedback=message
             if state.suggested_steps:
                 latest=state.suggested_steps[-1]
@@ -276,17 +258,18 @@ class S1ProFlow:
             if 'result' in event.data:result=event.data['result']
         if result is None or not result['ok']:
             state.awaiting='ticket_confirmation'
-            return await respond('degraded','目前无法核实官方排障依据。需要人工跟进的话，请回复“可以建单”。')
+            return await respond('degraded',copy.DEGRADED_SEARCH)
         items=result['data']['items']
         steps=[item for item in items if any(word in item['answer'] for word in ('侧刷','滚刷','胶条','密封'))]
         steps.sort(key=lambda item:0 if '侧刷' in item['answer'] else 1)
         next_step=next((item for item in steps if item['answer'] not in state.suggested_steps),None)
         if next_step is None:
             state.awaiting='ticket_confirmation'
-            return await respond('confirm_ticket','官方步骤已尝试但问题仍未解决。需要我创建工单交给人工跟进吗？请明确回复“可以建单”。')
+            return await respond('confirm_ticket',copy.CONFIRM_TICKET_STEPS_EXHAUSTED)
+        first_step=not state.suggested_steps
         state.suggested_steps.append(next_step['answer'])
         state.awaiting='feedback'
         source={'title':next_step['source_title'],'url':next_step['source_url']}
         if source not in state.sources:state.sources.append(source)
         await emit({'type':'search_done','title':next_step['source_title'],'url':next_step['source_url']})
-        return await respond('ask_feedback',f'先试一步：{next_step["answer"]} 完成后请告诉我吸力是否恢复。',source=source)
+        return await respond('ask_feedback',copy.suggest_step(next_step['answer'],first_step),source=source)
