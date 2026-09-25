@@ -354,6 +354,44 @@ async def test_image_only_asks_symptom_then_product_before_search():
     assert search.calls[0][1]=='T2080'
 
 
+async def test_progress_field_tracks_state_sources_and_ticket():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    assert first['progress']['product'] is None and first['progress']['suggested']==0
+    assert first['ticket_url'] is None
+    second=await flow.handle('是的',cid)
+    assert second['progress']['product']=='eufy S1 Pro (T2080)'
+    assert second['progress']['symptom']=='吸力变弱'
+    assert second['progress']['suggested']==1 and second['progress']['tried']==0
+    assert second['progress']['sources']==['Official suction help']
+    await flow.handle('还是不行',cid)
+    third=await flow.handle('还是不行',cid)
+    assert third['action']=='confirm_ticket'
+    assert third['progress']['suggested']==2 and third['progress']['tried']==2
+    created=await flow.handle('可以建单',cid)
+    assert created['progress']['ticket_no']=='Tfixed'
+    assert created['ticket_url']=='/s1pro/tickets/Tfixed'
+    assert '本地演示记录' in created['reply']
+    again=await flow.handle('可以建单',cid)
+    assert '本地演示记录' in again['reply'] and again['ticket_url']=='/s1pro/tickets/Tfixed'
+
+
+async def test_resolved_includes_maintenance_advice_and_source():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('是的',cid)
+    done=await flow.handle('清理后好了',cid)
+    assert done['action']=='resolved'
+    assert '复发' in done['reply'] and '吸力又不行了' in done['reply']
+    assert done['source']['url']=='https://service.eufy.com/a'
+    assert done['progress']['product']=='eufy S1 Pro (T2080)'
+    assert repo.tickets=={}
+
+
 async def test_image_only_reply_references_visible_clues():
     from app.s1pro.flow import S1ProFlow
     repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)

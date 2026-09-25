@@ -61,13 +61,21 @@ class S1ProFlow:
         tool_calls=0
         image_failure_notice='图片暂时没能读出来，先按文字继续。' if image_failed else ''
 
-        async def respond(action,reply,source=None,ticket_no=None):
+        async def respond(action,reply,source=None,ticket_no=None,ticket_url=None):
             if image_failure_notice:
                 reply=f'{image_failure_notice}{reply}'
             await self.repo.save_s1pro_state(conversation_id,state)
             await self.repo.append_message(conversation_id,'assistant',reply)
+            progress={'product':'eufy S1 Pro (T2080)' if state.confirmed_model else None,
+                      'symptom':state.symptom,
+                      'suggested':len(state.suggested_steps),
+                      'tried':len(state.completed_steps),
+                      'sources':[item['title'] for item in state.sources],
+                      'awaiting':state.awaiting,
+                      'ticket_no':state.ticket_no}
             return {'conversation_id':conversation_id,'action':action,'reply':reply,
-                    'source':source,'ticket_no':ticket_no,'tool_calls':tool_calls}
+                    'source':source,'ticket_no':ticket_no,'tool_calls':tool_calls,
+                    'progress':progress,'ticket_url':ticket_url}
 
         async def create_ticket():
             number=await self.repo.reserve_s1pro_ticket(conversation_id)
@@ -93,10 +101,14 @@ class S1ProFlow:
             except Exception:
                 return await respond('ticket_failed','工单尚未创建成功，请稍后重试；已保留当前排障信息。')
             state.awaiting=None
-            return await respond('ticket_created',f'已创建售后工单 {number}，人工可查看排障摘要。',ticket_no=number)
+            return await respond('ticket_created',
+                                 f'已创建售后工单 {number}（本地演示记录，未提交给安克客服），排障摘要已随单保存。',
+                                 ticket_no=number,ticket_url=f'/s1pro/tickets/{number}')
 
         if state.ticket_no and state.awaiting is None:
-            return await respond('ticket_created',f'工单 {state.ticket_no} 已创建，请等待人工跟进。',ticket_no=state.ticket_no)
+            return await respond('ticket_created',
+                                 f'工单 {state.ticket_no} 已创建（本地演示记录），请等待人工跟进。',
+                                 ticket_no=state.ticket_no,ticket_url=f'/s1pro/tickets/{state.ticket_no}')
 
         if state.awaiting=='ticket_confirmation':
             consent=_explicit_consent(message)
@@ -217,7 +229,10 @@ class S1ProFlow:
             feedback=understood.get('feedback')
             if feedback=='resolved' or (feedback is None and any(word in message for word in ('好了','恢复','正常','解决'))):
                 state.feedback='已恢复正常';state.awaiting=None
-                return await respond('resolved','很高兴吸力已恢复。本次排查已记录，无需创建工单。')
+                return await respond('resolved',
+                                     '很高兴吸力恢复正常。建议每 1-2 周清理一次滚刷、尘盒和过滤器，可以减少复发（依据见下方来源）。'
+                                     '如果问题再次出现，直接告诉我"吸力又不行了"，我们会接着这次的记录继续。',
+                                     source=state.sources[-1] if state.sources else None)
             if feedback!='unresolved' and not any(word in message for word in ('不行','没用','无效','仍然','还是')):
                 return await respond('ask_feedback','请告诉我刚才的步骤是否让吸力恢复？')
             state.feedback=message
