@@ -40,7 +40,12 @@ class S1ProFlow:
         *,
         observation: VisualObservation | None = None,
         image_failed: bool = False,
+        events=None,
     ):
+        async def emit(payload):
+            if events is not None:
+                await events(payload)
+
         if conversation_id is None:
             conversation_id=await self.repo.new_conversation('local-demo')
         else:
@@ -60,10 +65,11 @@ class S1ProFlow:
             }
         tool_calls=0
         image_failure_notice='图片暂时没能读出来，先按文字继续。' if image_failed else ''
+        urgent_notice=''
 
         async def respond(action,reply,source=None,ticket_no=None,ticket_url=None):
-            if image_failure_notice:
-                reply=f'{image_failure_notice}{reply}'
+            if urgent_notice:
+                reply=f'{urgent_notice}{reply}'
             await self.repo.save_s1pro_state(conversation_id,state)
             await self.repo.append_message(conversation_id,'assistant',reply)
             progress={'product':'eufy S1 Pro (T2080)' if state.confirmed_model else None,
@@ -72,10 +78,18 @@ class S1ProFlow:
                       'tried':len(state.completed_steps),
                       'sources':[item['title'] for item in state.sources],
                       'awaiting':state.awaiting,
+                      'urgent':state.urgent,
                       'ticket_no':state.ticket_no}
             return {'conversation_id':conversation_id,'action':action,'reply':reply,
                     'source':source,'ticket_no':ticket_no,'tool_calls':tool_calls,
-                    'progress':progress,'ticket_url':ticket_url}
+                    'progress':progress,'ticket_url':ticket_url,
+                    'notice':image_failure_notice or None}
+
+        def capture_urgency(understood):
+            nonlocal urgent_notice
+            if understood.get('urgency')=='urgent' and not state.urgent:
+                state.urgent=True
+                urgent_notice='明白您着急，这点我已记录；'
 
         async def create_ticket():
             number=await self.repo.reserve_s1pro_ticket(conversation_id)
@@ -90,6 +104,7 @@ class S1ProFlow:
             visual_summary=(f'图片提示（未核实）：{"；".join(visual_cues) or "无可读线索"}；'
                             if state.visual_observation else '')
             description=(f'产品型号：T2080；原始诉求：{original}；症状：{state.symptom or "待确认"}；'
+                         f'用户急迫表达：{"有（用户明确表示着急）" if state.urgent else "无"}；'
                          f'已建议步骤：{"、".join(state.suggested_steps) or "无"}；'
                          f'已尝试步骤：{"、".join(state.completed_steps) or "未反馈"}；'
                          f'用户反馈：{state.feedback or "未提供"}；'
@@ -113,11 +128,13 @@ class S1ProFlow:
         if state.awaiting=='ticket_confirmation':
             consent=_explicit_consent(message)
             if not consent and message.strip():
+                await emit({'type':'stage','stage':'understanding'})
                 try:
                     understood=await self.understanding.interpret(message,state)
                 except Exception:
                     return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
-                consent=understood.get('ticket_consent') is True
+                capture_urgency(understood)
+                consent=understood.get('ticket_consent') is True or understood.get('human_request') is True
             if not consent:
                 return await respond('confirm_ticket','需要人工跟进吗？如同意，请明确回复“可以建单”。')
             return await create_ticket()
@@ -130,10 +147,12 @@ class S1ProFlow:
         if affirmative_confirmation:
             understood={}
         elif message.strip():
+            await emit({'type':'stage','stage':'understanding'})
             try:
                 understood=await self.understanding.interpret(message,state)
             except Exception:
                 return await respond('degraded','我暂时无法可靠理解这条信息，请再明确描述产品或反馈。')
+            capture_urgency(understood)
         else:
             understood={}
 
@@ -206,6 +225,12 @@ class S1ProFlow:
             state.pending_model_candidate=None
             state.awaiting=None
 
+        if state.ticket_no is None and understood.get('human_request'):
+            state.awaiting='ticket_confirmation'
+            return await respond('confirm_ticket',
+                                 '好的，可以为您转人工跟进。本演示中“转人工”通过创建工单实现（本地演示记录，未提交给安克客服）。'
+                                 '如同意，请明确回复“可以建单”。')
+
         if state.awaiting is None and state.ticket_no is None and understood.get('ticket_consent'):
             return await create_ticket()
 
@@ -241,6 +266,7 @@ class S1ProFlow:
                 if latest not in state.completed_steps:state.completed_steps.append(latest)
 
         tools=build_s1pro_tools(self.knowledge_search)
+        await emit({'type':'stage','stage':'searching'})
         executor=ToolExecutor(tools,timeout_seconds=20)
         result=None
         tool_calls=1
@@ -262,4 +288,5 @@ class S1ProFlow:
         state.awaiting='feedback'
         source={'title':next_step['source_title'],'url':next_step['source_url']}
         if source not in state.sources:state.sources.append(source)
+        await emit({'type':'search_done','title':next_step['source_title'],'url':next_step['source_url']})
         return await respond('ask_feedback',f'先试一步：{next_step["answer"]} 完成后请告诉我吸力是否恢复。',source=source)

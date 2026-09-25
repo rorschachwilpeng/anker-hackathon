@@ -8,8 +8,8 @@ charset-normalizer==3.5.1
 click==8.5.0
 cryptography==50.0.1
 distro==1.9.0
-# Editable Git install with no remote (ecommerce-support==0.1.0)
--e /Users/qingyili/Documents/ChatGPT/AI客服/ecommerce-support
+# 应用本身以源码目录运行（uvicorn 从项目根目录启动即可 import app）；
+# 如需以包形式安装，请在本机执行 pip install -e . ，不要把本机绝对路径写进 lock。
 fastapi==0.141.1
 greenlet==3.5.6
 h11==0.16.0
@@ -36,6 +36,7 @@ pydantic==2.13.5
 pydantic-settings==2.15.0
 pydantic_core==2.46.5
 Pygments==2.21.0
+pymilvus==2.6.17
 PyMySQL==1.2.3
 pytest==9.1.1
 pytest-asyncio==1.4.0

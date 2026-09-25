@@ -419,7 +419,8 @@ async def test_image_failure_keeps_text_path_and_previous_state_fields():
 
     first=await flow.handle('我的 S1 Pro 不吸了',image_failed=True)
     assert first['action']=='clarify_product'
-    assert '图片暂时没能读出来' in first['reply']
+    assert '图片暂时没能读出来' in first['notice']
+    assert '图片暂时没能读出来' not in first['reply']
     assert repo.states[first['conversation_id']].visual_observation is None
     assert search.calls==[]
 
@@ -436,7 +437,8 @@ async def test_failed_image_without_text_requests_symptom_and_stores_no_image_da
     state=repo.states[result['conversation_id']]
 
     assert result['action']=='ask_symptom'
-    assert '图片暂时没能读出来' in result['reply']
+    assert '图片暂时没能读出来' in result['notice']
+    assert '图片暂时没能读出来' not in result['reply']
     assert '[用户上传图片]' in repo.messages[result['conversation_id']][0]['content']
     assert state.visual_observation is None and state.pending_model_candidate is None
     assert search.calls==[]
@@ -452,7 +454,8 @@ async def test_image_failure_preserves_previous_visual_observation_and_candidate
 
     state=repo.states[first['conversation_id']]
     assert continued['action']=='clarify_product'
-    assert '图片暂时没能读出来' in continued['reply']
+    assert '图片暂时没能读出来' in continued['notice']
+    assert '图片暂时没能读出来' not in continued['reply']
     assert state.visual_observation==previous
     assert state.pending_model_candidate=='T2080'
     assert search.calls==[]
@@ -479,3 +482,105 @@ async def test_ticket_summary_marks_visual_clues_unverified():
     assert '灰色机器人外观' in description
     assert '无法确认设备当前状态' in description
     assert 'base64' not in description
+
+
+class UrgentUnderstanding(Understanding):
+    async def interpret(self,message,state):
+        result=await super().interpret(message,state)
+        if any(word in message for word in ('急','赶紧','马上','尽快')):
+            result['urgency']='urgent'
+        return result
+
+
+async def test_urgent_message_is_acknowledged_and_tracked():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了，明天请客急着用')
+    assert first['action']=='ask_feedback'
+    assert first['reply'].startswith('明白您着急，这点我已记录；')
+    assert first['progress']['urgent'] is True
+    cid=first['conversation_id']
+    followup=await flow.handle('还是不行',cid)
+    assert not followup['reply'].startswith('明白您着急')
+    assert followup['progress']['urgent'] is True
+    assert repo.states[cid].urgent is True
+
+
+async def test_urgent_flag_is_written_into_ticket_description():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了，急着用，麻烦尽快')
+    cid=first['conversation_id']
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    created=await flow.handle('可以建单',cid)
+    description=repo.tickets[created['ticket_no']]['description']
+    assert '用户急迫表达：有（用户明确表示着急）' in description
+
+
+async def test_non_urgent_message_has_no_urgent_marker():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    assert first['action']=='ask_feedback'
+    assert not first['reply'].startswith('明白您着急')
+    assert first['progress']['urgent'] is False
+
+
+async def test_notice_is_none_without_image_failure():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    assert first['action']=='ask_feedback'
+    assert first['notice'] is None
+
+
+class HumanUnderstanding(Understanding):
+    async def interpret(self,message,state):
+        result=await super().interpret(message,state)
+        if '人工' in message or '真人' in message:
+            result['human_request']=True
+        return result
+
+
+async def test_stage_events_are_emitted_at_real_wait_points():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    seen=[]
+    async def collect(payload):seen.append(payload)
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了',events=collect)
+    assert [payload['type'] for payload in seen]==['stage','stage','search_done']
+    assert seen[0]['stage']=='understanding' and seen[1]['stage']=='searching'
+    assert seen[2]['title']=='Official suction help'
+    second=await flow.handle('还是不行',first['conversation_id'])
+    assert second['action']=='ask_feedback'
+
+
+async def test_human_request_goes_straight_to_ticket_confirmation():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,HumanUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    ask=await flow.handle('别折腾了，我要找人工客服',cid)
+    assert ask['action']=='confirm_ticket'
+    assert '转人工' in ask['reply'] and '本地演示记录' in ask['reply']
+    created=await flow.handle('可以建单',cid)
+    assert created['action']=='ticket_created'
+
+
+async def test_human_request_counts_as_consent_during_confirmation():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,HumanUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    created=await flow.handle('我要转人工',cid)
+    assert created['action']=='ticket_created'
+
+
+async def test_human_request_before_product_confirmation_still_clarifies():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,HumanUnderstanding(),Search())
+    first=await flow.handle('我要找人工客服')
+    assert first['action']=='clarify_product'

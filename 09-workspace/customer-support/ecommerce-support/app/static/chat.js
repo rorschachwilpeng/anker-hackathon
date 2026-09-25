@@ -108,13 +108,58 @@ function updateS1ProStatus(progress,stage) {
   if (progress.symptom) parts.push(`症状：${progress.symptom}`);
   parts.push(`已建议 ${progress.suggested} 步 · 已尝试 ${progress.tried} 步`);
   parts.push(`阶段：${stage}`);
+  if (progress.urgent) parts.push('用户已表示着急');
   if (Array.isArray(progress.sources)&&progress.sources.length) parts.push(`来源：${progress.sources[progress.sources.length-1]}`);
   if (progress.ticket_no) parts.push(`工单：${progress.ticket_no}`);
   bar.textContent=parts.join(' ｜ '); bar.hidden=false;
 }
+async function streamS1Pro(response,view) {
+  if(!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
+    showS1Pro(await response.json(),view); return;
+  }
+  const reader=response.body.getReader(); const decoder=new TextDecoder(); let buffer='', result=null, failure=null;
+  const stageText={understanding:'正在理解您的描述…',searching:'正在检索 eufy 官方排障资料…'};
+  try {
+    for(;;) {
+      const {value,done}=await reader.read(); buffer+=done?decoder.decode():decoder.decode(value,{stream:true});
+      let boundary;
+      while((boundary=/\r?\n\r?\n/.exec(buffer))) {
+        const block=buffer.slice(0,boundary.index); buffer=buffer.slice(boundary.index+boundary[0].length);
+        const lines=block.split(/\r?\n/); const event=lines.find(line=>line.startsWith('event:'))?.slice(6).trim();
+        const raw=lines.filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
+        if(!raw) continue;
+        const data=JSON.parse(raw);
+        if(event==='stage') { view.bubble.textContent=stageText[data.stage]||'正在处理…'; scrollDown(); }
+        if(event==='search_done' && typeof data.title==='string') {
+          const badge=document.createElement('span'); badge.className='tool-badge'; badge.dataset.status='succeeded';
+          badge.textContent=`检索到官方资料：${data.title}`; view.tools.append(badge); scrollDown();
+        }
+        if(event==='error') failure=data;
+        if(event==='result') result=data;
+      }
+      if(done) break;
+    }
+  } finally { await reader.cancel().catch(()=>{}); reader.releaseLock(); }
+  if(failure) throw new Error(typeof failure.message==='string'?failure.message:'服务暂时不可用，请重试。');
+  if(!result) throw new Error('回复没有完整到达，请重试。');
+  showS1Pro(result,view);
+}
+const s1proQuickReplies={product:['是的，就是这款','不是这款产品'],symptom:['吸力变弱'],feedback:['好了，吸力恢复了','还是不行'],ticket_confirmation:['可以建单','再想想，先不建']};
+function renderS1ProQuickReplies(view,awaiting) {
+  const options=s1proQuickReplies[awaiting];
+  if(!options) return;
+  const row=document.createElement('div'); row.className='quick-replies';
+  for(const text of options) {
+    const button=document.createElement('button'); button.type='button'; button.className='quick-reply'; button.textContent=text;
+    button.onclick=()=>{ if(active) return; $('message').value=text; syncInput(); $('composer').requestSubmit(); };
+    row.append(button);
+  }
+  view.article.append(row); scrollDown();
+}
 function showS1Pro(data,view) {
   if (!Number.isSafeInteger(data.conversation_id) || typeof data.reply !== 'string') throw new Error('服务回复格式异常。');
   conversationId=data.conversation_id; view.bubble.textContent=data.reply;
+  if (typeof data.notice==='string' && data.notice) note(view,data.notice);
   if (data.source?.url && data.source?.title) {
     const link=document.createElement('a'); link.href=data.source.url; link.textContent=`资料来源：${data.source.title}`;
     link.target='_blank'; link.rel='noopener noreferrer'; view.article.append(link);
@@ -126,6 +171,7 @@ function showS1Pro(data,view) {
   const stage=s1proStages[data.action]||'处理中';
   note(view,`当前阶段：${stage}`);
   updateS1ProStatus(data.progress,stage);
+  renderS1ProQuickReplies(view,data.progress?.awaiting);
 }
 function closeImageMenu() {
   $('add-menu').hidden=true;
@@ -167,7 +213,7 @@ async function submit(event) {
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
   $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在生成回复':'正在提取售后信息';
   addMessage('user',message,submittedImage?{url:submittedPreviewUrl}:null);
-  const view=addMessage('assistant',submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在思考…':'正在整理…');
+  const view=addMessage('assistant',submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在思考…':submittedMode==='s1pro'?'正在理解您的描述…':'正在整理…');
   if(submittedImage) clearImageDraft({revoke:false});
   let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},150000);
   try {
@@ -186,11 +232,12 @@ async function submit(event) {
       const {answer,reason}=await streamChat(response,view);
       if(reason==='length') note(view,'回复达到长度上限，内容可能不完整；本轮未加入对话记忆。');
 
-    } else if(submittedMode==='s1pro') showS1Pro(await response.json(),view);
+    } else if(submittedMode==='s1pro'&&!submittedImage) await streamS1Pro(response,view);
+    else if(submittedMode==='s1pro') showS1Pro(await response.json(),view);
     else showExtraction(await response.json(),view);
     $('announcement').textContent='回复完成';
   } catch(error) {
-    if(['正在思考…','正在整理…','正在识别图片并整理可见线索…'].includes(view.bubble.textContent)) view.bubble.textContent='';
+    if(['正在思考…','正在整理…','正在识别图片并整理可见线索…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
     const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
     for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
     note(view,text+' 已提交的工单不会因停止生成而撤销。',!controller.signal.aborted||timedOut);
