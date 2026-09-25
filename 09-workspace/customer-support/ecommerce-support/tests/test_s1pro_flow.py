@@ -419,7 +419,8 @@ async def test_image_failure_keeps_text_path_and_previous_state_fields():
 
     first=await flow.handle('我的 S1 Pro 不吸了',image_failed=True)
     assert first['action']=='clarify_product'
-    assert '图片暂时没能读出来' in first['reply']
+    assert '图片暂时没能读出来' in first['notice']
+    assert '图片暂时没能读出来' not in first['reply']
     assert repo.states[first['conversation_id']].visual_observation is None
     assert search.calls==[]
 
@@ -436,7 +437,8 @@ async def test_failed_image_without_text_requests_symptom_and_stores_no_image_da
     state=repo.states[result['conversation_id']]
 
     assert result['action']=='ask_symptom'
-    assert '图片暂时没能读出来' in result['reply']
+    assert '图片暂时没能读出来' in result['notice']
+    assert '图片暂时没能读出来' not in result['reply']
     assert '[用户上传图片]' in repo.messages[result['conversation_id']][0]['content']
     assert state.visual_observation is None and state.pending_model_candidate is None
     assert search.calls==[]
@@ -452,7 +454,8 @@ async def test_image_failure_preserves_previous_visual_observation_and_candidate
 
     state=repo.states[first['conversation_id']]
     assert continued['action']=='clarify_product'
-    assert '图片暂时没能读出来' in continued['reply']
+    assert '图片暂时没能读出来' in continued['notice']
+    assert '图片暂时没能读出来' not in continued['reply']
     assert state.visual_observation==previous
     assert state.pending_model_candidate=='T2080'
     assert search.calls==[]
@@ -522,3 +525,11 @@ async def test_non_urgent_message_has_no_urgent_marker():
     assert first['action']=='ask_feedback'
     assert not first['reply'].startswith('明白您着急')
     assert first['progress']['urgent'] is False
+
+
+async def test_notice_is_none_without_image_failure():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    assert first['action']=='ask_feedback'
+    assert first['notice'] is None

@@ -65,8 +65,6 @@ class S1ProFlow:
         async def respond(action,reply,source=None,ticket_no=None,ticket_url=None):
             if urgent_notice:
                 reply=f'{urgent_notice}{reply}'
-            if image_failure_notice:
-                reply=f'{image_failure_notice}{reply}'
             await self.repo.save_s1pro_state(conversation_id,state)
             await self.repo.append_message(conversation_id,'assistant',reply)
             progress={'product':'eufy S1 Pro (T2080)' if state.confirmed_model else None,
@@ -79,7 +77,8 @@ class S1ProFlow:
                       'ticket_no':state.ticket_no}
             return {'conversation_id':conversation_id,'action':action,'reply':reply,
                     'source':source,'ticket_no':ticket_no,'tool_calls':tool_calls,
-                    'progress':progress,'ticket_url':ticket_url}
+                    'progress':progress,'ticket_url':ticket_url,
+                    'notice':image_failure_notice or None}
 
         def capture_urgency(understood):
             nonlocal urgent_notice

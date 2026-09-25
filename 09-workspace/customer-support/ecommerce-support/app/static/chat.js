@@ -116,6 +116,7 @@ function updateS1ProStatus(progress,stage) {
 function showS1Pro(data,view) {
   if (!Number.isSafeInteger(data.conversation_id) || typeof data.reply !== 'string') throw new Error('服务回复格式异常。');
   conversationId=data.conversation_id; view.bubble.textContent=data.reply;
+  if (typeof data.notice==='string' && data.notice) note(view,data.notice);
   if (data.source?.url && data.source?.title) {
     const link=document.createElement('a'); link.href=data.source.url; link.textContent=`资料来源：${data.source.title}`;
     link.target='_blank'; link.rel='noopener noreferrer'; view.article.append(link);
