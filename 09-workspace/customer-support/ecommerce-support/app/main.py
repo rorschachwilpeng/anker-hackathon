@@ -17,7 +17,7 @@ from app.chat_service import ChatService
 from app.routes.chat import stateful_chat
 from app.config import Settings
 from app.context import ContextBudgetExceeded
-from app.schemas import AfterSales, ChatRequest, ExtractionRequest
+from app.schemas import AfterSales, ChatRequest, ExtractionRequest, TicketStatusUpdate
 from app.service import CustomerSupportService, FinishChunk, TokenChunk
 from app.knowledge.embeddings import SiliconFlowEmbeddings
 from app.knowledge.repository import KnowledgeRepository
@@ -177,6 +177,14 @@ def create_app(
         flow=application.state.s1pro_flow
         if flow is None:raise HTTPException(503,'S1 Pro service is unavailable')
         result=await flow.repo.get_s1pro_ticket(ticket_no)
+        if result is None:raise HTTPException(404,'工单不存在。')
+        return result
+
+    @application.post('/s1pro/tickets/{ticket_no}/status')
+    async def s1pro_ticket_status(ticket_no: str, payload: TicketStatusUpdate) -> dict[str, Any]:
+        flow=application.state.s1pro_flow
+        if flow is None:raise HTTPException(503,'S1 Pro service is unavailable')
+        result=await flow.repo.update_s1pro_ticket_status(ticket_no,payload.status)
         if result is None:raise HTTPException(404,'工单不存在。')
         return result
 

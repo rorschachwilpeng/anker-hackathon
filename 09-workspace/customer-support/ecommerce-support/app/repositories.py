@@ -97,3 +97,15 @@ class Repository:
                 'suggested_steps':state.suggested_steps,'completed_steps':state.completed_steps,
                 'feedback':state.feedback,'sources':state.sources,
                 'description':row['description'],'status':row['status']}
+
+    async def update_s1pro_ticket_status(self, number, status):
+        from app.s1pro.state import S1ProState
+        async with self.sessions.begin() as session:
+            row=(await session.execute(select(tickets.c.ticket_no,conversations.c.task_state).join(
+                conversations,tickets.c.conversation_id==conversations.c.id
+            ).where(tickets.c.ticket_no==number))).mappings().first()
+            if row is None:return None
+            state=S1ProState.from_dict(row['task_state'])
+            if state.confirmed_model!='T2080':return None
+            await session.execute(update(tickets).where(tickets.c.ticket_no==number).values(status=status))
+        return {'ticket_no':number,'status':status}

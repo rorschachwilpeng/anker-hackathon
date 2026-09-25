@@ -12,6 +12,7 @@ class S1ProState:
     completed_steps: list[str] = field(default_factory=list)
     sources: list[dict[str, str]] = field(default_factory=list)
     feedback: str | None = None
+    urgent: bool = False
     awaiting: Literal['product', 'symptom', 'feedback', 'ticket_confirmation'] | None = None
     ticket_no: str | None = None
 

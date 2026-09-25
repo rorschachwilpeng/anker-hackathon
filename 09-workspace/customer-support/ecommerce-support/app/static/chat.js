@@ -108,6 +108,7 @@ function updateS1ProStatus(progress,stage) {
   if (progress.symptom) parts.push(`症状：${progress.symptom}`);
   parts.push(`已建议 ${progress.suggested} 步 · 已尝试 ${progress.tried} 步`);
   parts.push(`阶段：${stage}`);
+  if (progress.urgent) parts.push('用户已表示着急');
   if (Array.isArray(progress.sources)&&progress.sources.length) parts.push(`来源：${progress.sources[progress.sources.length-1]}`);
   if (progress.ticket_no) parts.push(`工单：${progress.ticket_no}`);
   bar.textContent=parts.join(' ｜ '); bar.hidden=false;

@@ -479,3 +479,46 @@ async def test_ticket_summary_marks_visual_clues_unverified():
     assert '灰色机器人外观' in description
     assert '无法确认设备当前状态' in description
     assert 'base64' not in description
+
+
+class UrgentUnderstanding(Understanding):
+    async def interpret(self,message,state):
+        result=await super().interpret(message,state)
+        if any(word in message for word in ('急','赶紧','马上','尽快')):
+            result['urgency']='urgent'
+        return result
+
+
+async def test_urgent_message_is_acknowledged_and_tracked():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了，明天请客急着用')
+    assert first['action']=='ask_feedback'
+    assert first['reply'].startswith('明白您着急，这点我已记录；')
+    assert first['progress']['urgent'] is True
+    cid=first['conversation_id']
+    followup=await flow.handle('还是不行',cid)
+    assert not followup['reply'].startswith('明白您着急')
+    assert followup['progress']['urgent'] is True
+    assert repo.states[cid].urgent is True
+
+
+async def test_urgent_flag_is_written_into_ticket_description():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了，急着用，麻烦尽快')
+    cid=first['conversation_id']
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    created=await flow.handle('可以建单',cid)
+    description=repo.tickets[created['ticket_no']]['description']
+    assert '用户急迫表达：有（用户明确表示着急）' in description
+
+
+async def test_non_urgent_message_has_no_urgent_marker():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,UrgentUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    assert first['action']=='ask_feedback'
+    assert not first['reply'].startswith('明白您着急')
+    assert first['progress']['urgent'] is False

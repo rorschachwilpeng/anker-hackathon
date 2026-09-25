@@ -1,6 +1,7 @@
 'use strict';
 const list = document.getElementById('tickets');
 const detail = document.getElementById('detail');
+const STATUSES = ['待处理', '处理中', '已解决'];
 function field(label, value) {
   const row = document.createElement('p');
   row.textContent = `${label}：${Array.isArray(value) ? value.join('；') : (value || '待补充')}`;
@@ -18,14 +19,42 @@ async function showTicket(number) {
     const link = document.createElement('a'); link.textContent = source.title; link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
     row.append(link); detail.append(row);
   }
-}
-fetch('/s1pro/tickets').then(response => response.json()).then(tickets => {
-  if (!tickets.length) { list.textContent = '暂无 S1 Pro 工单。'; return; }
-  for (const ticket of tickets) {
+  const actions = document.createElement('p');
+  actions.textContent = '更新状态（本地演示）：';
+  for (const next of STATUSES) {
     const button = document.createElement('button');
-    button.textContent = `${ticket.ticket_no} · ${ticket.symptom || '问题待确认'} · ${ticket.status}`;
-    button.style.cssText = 'display:block;margin:10px 0;padding:10px';
-    button.onclick = () => showTicket(ticket.ticket_no);
-    list.append(button);
+    button.textContent = next;
+    button.disabled = ticket.status === next;
+    button.style.cssText = 'margin:0 8px 0 0;padding:4px 12px';
+    button.onclick = async () => {
+      button.disabled = true;
+      const update = await fetch(`/s1pro/tickets/${encodeURIComponent(ticket.ticket_no)}/status`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: next})
+      });
+      if (update.ok) { showTicket(ticket.ticket_no); loadTickets(); return; }
+      button.disabled = false;
+    };
+    actions.append(button);
   }
-}).catch(() => { list.textContent = '工单列表暂时无法加载。'; });
+  detail.append(actions);
+}
+async function loadTickets() {
+  try {
+    const response = await fetch('/s1pro/tickets');
+    const tickets = await response.json();
+    list.replaceChildren();
+    if (!tickets.length) { list.textContent = '暂无 S1 Pro 工单。'; return; }
+    for (const ticket of tickets) {
+      const button = document.createElement('button');
+      button.textContent = `${ticket.ticket_no} · ${ticket.symptom || '问题待确认'} · ${ticket.status}`;
+      button.style.cssText = 'display:block;margin:10px 0;padding:10px';
+      button.onclick = () => showTicket(ticket.ticket_no);
+      list.append(button);
+    }
+  } catch {
+    list.textContent = '工单列表暂时无法加载。';
+  }
+}
+loadTickets();

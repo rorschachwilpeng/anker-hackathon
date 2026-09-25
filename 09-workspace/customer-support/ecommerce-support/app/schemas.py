@@ -63,3 +63,9 @@ class AfterSales(BaseModel):
     order_id: str | None
     request_type: Literal["refund", "return_refund", "exchange", "repair", "logistics", "other", "unknown"]
     expected_solution: str | None
+
+
+class TicketStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["待处理", "处理中", "已解决"]
