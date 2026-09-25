@@ -120,6 +120,24 @@ def create_app(
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    def order_repository():
+        chat=application.state.chat_service
+        repo=getattr(chat,'repo',None)
+        if repo is None:raise HTTPException(503,'订单服务暂不可用。')
+        return repo
+
+    @application.get('/api/orders/{order_no}')
+    async def order_detail(order_no: str) -> dict[str, Any]:
+        result=await order_repository().get_order_detail(order_no)
+        if result is None:raise HTTPException(404,'演示订单不存在。')
+        return result
+
+    @application.get('/orders/{order_no}',include_in_schema=False)
+    async def order_detail_page(order_no: str) -> FileResponse:
+        result=await order_repository().get_order_detail(order_no)
+        if result is None:raise HTTPException(404,'演示订单不存在。')
+        return FileResponse(static_dir/'order.html',headers={'Cache-Control':'no-cache'})
+
     @application.post('/s1pro/chat')
     async def s1pro_chat(request: ChatRequest) -> StreamingResponse:
         flow=application.state.s1pro_flow

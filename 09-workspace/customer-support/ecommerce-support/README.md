@@ -23,17 +23,17 @@ docker compose up -d mysql etcd minio milvus
 .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-MySQL 8.4 仅暴露 `127.0.0.1:3307`，使用项目命名卷。初始化采用用户提供的 `sql/ch02-schema.sql`，仅创建缺失表，检查既有结构并幂等灌入演示数据，不删除已有数据。结构不兼容会拒绝初始化。启动应用前先初始化数据库。不要通过 `docker compose down -v` 清理持久数据。
+MySQL 8.4 仅暴露 `127.0.0.1:3307`，使用项目命名卷。初始化从 `sql/ch02-schema.sql` 与 `sql/ch04-orders-schema.sql` 创建缺失表，检查既有结构并幂等灌入演示数据，不删除已有数据。结构不兼容会拒绝初始化。启动应用前先初始化数据库。不要通过 `docker compose down -v` 清理持久数据。
 
 ## 浏览器演示
 
 打开 http://127.0.0.1:8000/ ，分别点击“新对话”后输入：
 
-1. **订单 1001 的物流到哪了**：显示“查询物流”徽章，按随机模拟结果作答。
+1. **订单 DEMO-1001 的物流到哪了**：显示固定演示订单卡片；点击“查看订单详情”查看同一记录与完整物流时间线。其他订单号明确返回未找到，不生成替代数据。
 2. **退货政策是什么**：显示“查询常见问题”，从知识库召回七天退货政策及例外。
 3. **邮费是多少**：显示“查询常见问题”，语义召回“订单实付满99元包邮，未满99元收取8元运费”及偏远/大件例外。
 
-也可以问“商品 P1001 的价格和库存”“订单 1001 的金额”，或明确要求创建咨询工单。订单、商品、物流都是 mock；工单会实际写入本地 tickets 表。
+也可以问“商品 P1001 的价格和库存”，或明确要求创建咨询工单。商品价格和库存仍为随机 mock；订单 DEMO-1001 与物流是固定演示记录；工单会实际写入本地 tickets 表。
 
 本页自动保留当前 conversation_id。新对话、刷新和切换功能会开始新的页面会话，已存数据库记录保留；本章没有历史列表。停止生成不撤销已提交的工单。不同 HTTP 请求不自动去重，避免对已经成功的工单重复提问。
 
@@ -90,6 +90,7 @@ data: {"finish_reason":"stop"}
 ```bash
 # 文档导入、断点续跑和状态
 .venv/bin/python scripts/knowledge.py import-dir knowledge/demo
+.venv/bin/python scripts/knowledge.py import-dir knowledge/s1pro
 .venv/bin/python scripts/knowledge.py resume
 .venv/bin/python scripts/knowledge.py status
 

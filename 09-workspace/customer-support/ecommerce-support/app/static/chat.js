@@ -42,6 +42,43 @@ function addMessage(role, text, image = null) {
 function note(view,text,error=false) {
   const el=document.createElement('div'); el.className='message-note'+(error?' error':''); el.textContent=text; view.article.append(el); scrollDown();
 }
+function renderOrderCard(data,view) {
+  if(!data?.found||data.source!=='demo'||!data.order||!Array.isArray(data.items)) throw new Error('订单卡片数据格式异常，请重试。');
+  const order=data.order;
+  const card=document.createElement('section'); card.className='order-card'; card.setAttribute('aria-label','演示订单信息');
+  const heading=document.createElement('div'); heading.className='order-card-heading';
+  const title=document.createElement('strong'); title.textContent='订单 '+order.order_no;
+  const badge=document.createElement('span'); badge.textContent='演示数据'; heading.append(title,badge);
+  const products=document.createElement('div');products.className='order-card-products';
+  if(data.items.length) for(const item of data.items) {
+    const product=document.createElement('p');product.className='order-card-product';
+    product.textContent=`${item.product_name} · ${item.model_code}`;products.append(product);
+  } else {
+    const product=document.createElement('p');product.className='order-card-product';product.textContent='暂无商品明细';products.append(product);
+  }
+  const rows=document.createElement('dl');
+  for(const [label,value] of [['支付状态',order.payment_status],['配送状态',order.shipping_status]]) {
+    const dt=document.createElement('dt');dt.textContent=label;const dd=document.createElement('dd');dd.textContent=value;rows.append(dt,dd);
+  }
+  const event=document.createElement('p'); event.className='order-card-event';
+  event.textContent=data.latest_event?`最新物流：${data.latest_event.occurred_at} · ${data.latest_event.location} · ${data.latest_event.description}`:'最新物流：暂无物流记录';
+  const link=document.createElement('a'); link.href='/orders/'+encodeURIComponent(order.order_no); link.target='_blank'; link.rel='noopener noreferrer'; link.textContent='查看订单详情 ↗';
+  card.append(heading,products,rows,event,link); view.article.append(card); scrollDown();
+}
+function renderKnowledgeSources(data,view) {
+  if(!Array.isArray(data?.items)) return;
+  const sources=data.items.filter(item=>item&&item.product_model&&item.source_title&&typeof item.source_url==='string');
+  if(!sources.length) return;
+  const section=document.createElement('div');section.className='knowledge-sources';
+  for(const item of sources) {
+    let url;
+    try { url=new URL(item.source_url); } catch { continue; }
+    if(url.protocol!=='https:'||!['service.eufy.com','www.eufy.com','salesforce-knowledge-download.s3.us-west-2.amazonaws.com'].includes(url.hostname)) continue;
+    const link=document.createElement('a');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';
+    link.textContent=`型号 ${item.product_model} · 官方资料：${item.source_title}`;section.append(link);
+  }
+  if(section.childElementCount) {view.article.append(section);scrollDown();}
+}
 function reset(next=mode) {
   if(active) return;
   for (const url of previewUrls) URL.revokeObjectURL(url);
@@ -78,6 +115,8 @@ async function streamChat(response,view) {
         if(event==='answer_reset') {answer='';view.bubble.textContent='正在查询…';}
         if(event==='session') { if(!Number.isSafeInteger(data.conversation_id)||data.conversation_id<1) throw new Error('会话标识无效'); conversationId=data.conversation_id; }
         if(event==='tool_status') updateToolBadge(view,data);
+        if(event==='order_card') renderOrderCard(data,view);
+        if(event==='knowledge_sources') renderKnowledgeSources(data,view);
         if(event==='error') throw new Error(data.message || '回复中断，请重试。');
         if(event==='token') {
           if(typeof data.text!=='string') throw new Error('回复格式异常，请重试。');

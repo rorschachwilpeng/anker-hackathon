@@ -21,7 +21,7 @@ class KnowledgeSearch:
 
     async def find(self, keyword: str) -> list[dict]:
         vectors = await self.embeddings.encode([keyword])
-        hits = await self.vectors.search(vectors[0], self.top_k)
+        hits = await self.vectors.search(vectors[0], min(20, self.top_k * 4))
         accepted = [hit for hit in hits if hit.score >= self.threshold]
         if not accepted:
             return []
@@ -32,12 +32,15 @@ class KnowledgeSearch:
             if row is None or row.content_hash != hit.content_hash:
                 logger.info("knowledge candidate rejected id=%s reason=stale", hit.id)
                 continue
+            if row.draft.product_model is not None:
+                continue
             items.append({
                 "id": row.id,
                 "question": row.draft.questions,
                 "answer": row.draft.answer,
                 "category": row.draft.category,
             })
+            if len(items)==self.top_k:break
         return items
 
     async def find_for_model(self, query: str, confirmed_model: str) -> list[dict]:

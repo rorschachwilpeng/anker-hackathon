@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Index, MetaData, Table, Text, String, text
+from sqlalchemy import Column, ForeignKey, Index, Integer, MetaData, Numeric, Table, Text, String, text
 from sqlalchemy.dialects.mysql import BIGINT, DATETIME, ENUM, JSON
 
 metadata = MetaData()
@@ -30,3 +30,33 @@ tickets = Table('tickets',metadata,
     Column('conversation_id',BIGINT(unsigned=True),ForeignKey('conversations.id',name='fk_tickets_conversation'),nullable=False),
     Column('description',Text,nullable=False),Column('ticket_type',ENUM('售后','投诉','咨询'),nullable=False),
     Column('status',ENUM('待处理','已处理'),nullable=False,server_default='待处理'),created(),Index('idx_conversation_id','conversation_id'),**options)
+
+demo_orders = Table('demo_orders',metadata,
+    Column('order_no',String(64),primary_key=True),
+    Column('placed_at',DATETIME(),nullable=False),
+    Column('purchase_channel',String(64),nullable=False),
+    Column('payment_status',String(32),nullable=False),
+    Column('paid_amount',Numeric(10,2),nullable=False),
+    Column('currency',String(3),nullable=False),
+    Column('shipping_status',String(32),nullable=False),
+    Column('estimated_delivery_at',DATETIME(),nullable=True),
+    Column('source',String(16),nullable=False,server_default='demo'),
+    created(),updated(),**options)
+demo_order_items = Table('demo_order_items',metadata,ident(),
+    Column('order_no',String(64),ForeignKey('demo_orders.order_no',name='fk_demo_order_items_order'),nullable=False),
+    Column('product_name',String(128),nullable=False),
+    Column('product_line',String(64),nullable=False),
+    Column('category',String(64),nullable=False),
+    Column('model_code',String(32),nullable=False),
+    Column('quantity',Integer(),nullable=False),
+    created(),Index('idx_demo_order_items_order','order_no'),**options)
+demo_order_events = Table('demo_order_events',metadata,ident(),
+    Column('order_no',String(64),ForeignKey('demo_orders.order_no',name='fk_demo_order_events_order'),nullable=False),
+    Column('occurred_at',DATETIME(),nullable=False),
+    Column('location',String(128),nullable=False),
+    Column('description',String(255),nullable=False),
+    created(),Index('uq_demo_order_event','order_no','occurred_at',unique=True),**options)
+conversation_order_context = Table('conversation_order_context',metadata,
+    Column('conversation_id',BIGINT(unsigned=True),ForeignKey('conversations.id',name='fk_order_context_conversation'),primary_key=True),
+    Column('order_no',String(64),ForeignKey('demo_orders.order_no',name='fk_order_context_order'),nullable=False),
+    updated(),**options)

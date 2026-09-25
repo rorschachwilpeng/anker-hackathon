@@ -20,14 +20,15 @@ def validate_column_defaults(table,name,actual):
         raise RuntimeError('schema autoincrement mismatch: '+table)
 
 async def initialize(db):
-    source=Path(__file__).resolve().parents[1]/'sql/ch02-schema.sql'
-    sql='\n'.join(line for line in source.read_text().splitlines() if not line.lstrip().startswith('--'))
+    sql_dir=Path(__file__).resolve().parents[1]/'sql'
     async with db.engine.begin() as connection:
         existing=await connection.run_sync(lambda c: inspect(c).get_table_names())
-        for statement in sql.split(';'):
-            if not statement.strip():continue
-            name=statement.split('CREATE TABLE ')[1].split()[0]
-            if name not in existing:await connection.execute(text(statement))
+        for filename in ('ch02-schema.sql','ch04-orders-schema.sql'):
+            sql='\n'.join(line for line in (sql_dir/filename).read_text().splitlines() if not line.lstrip().startswith('--'))
+            for statement in sql.split(';'):
+                if not statement.strip():continue
+                name=statement.split('CREATE TABLE ')[1].split()[0]
+                if name not in existing:await connection.execute(text(statement))
         def validate(c):
             inspector=inspect(c)
             for table in metadata.sorted_tables:
@@ -54,8 +55,9 @@ async def initialize(db):
                 expected_fks={((f.parent.name,),f.column.table.name,(f.column.name,)) for f in table.foreign_keys}
                 if actual_fks!=expected_fks:raise RuntimeError('schema foreign keys mismatch')
         await connection.run_sync(validate)
-        for statement in (source.parent/'ch02-seed.sql').read_text().split(';'):
-            if statement.strip():await connection.execute(text(statement))
+        for filename in ('ch02-seed.sql','ch04-orders-seed.sql'):
+            for statement in (sql_dir/filename).read_text().split(';'):
+                if statement.strip():await connection.execute(text(statement))
 
 async def main():
     values=dotenv_values(Path(__file__).resolve().parents[1]/'.env')

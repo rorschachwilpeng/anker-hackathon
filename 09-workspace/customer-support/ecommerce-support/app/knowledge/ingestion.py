@@ -10,6 +10,9 @@ from app.knowledge.chunking import split_markdown
 from app.knowledge.text import embedding_text
 from app.knowledge.types import ChunkDraft, KnowledgeError
 
+ALLOWED_PRODUCT_MODELS={'T2080','T8D04'}
+ALLOWED_SOURCE_HOSTS={'service.eufy.com','www.eufy.com','salesforce-knowledge-download.s3.us-west-2.amazonaws.com'}
+
 class InjectedFailure(RuntimeError):
     pass
 
@@ -28,8 +31,8 @@ def parse_directory(path):
             for source in sources.values():
                 address=urlsplit(source['source_url'])
                 date.fromisoformat(source['retrieved_on'])
-                if (source['product_model']!='T2080' or not source['source_title'].strip()
-                        or address.scheme!='https' or address.netloc!='service.eufy.com'):
+                if (source['product_model'] not in ALLOWED_PRODUCT_MODELS or not source['source_title'].strip()
+                        or address.scheme!='https' or address.netloc not in ALLOWED_SOURCE_HOSTS):
                     raise ValueError('invalid source metadata')
         except (ValueError,KeyError,TypeError,json.JSONDecodeError) as exc:
             raise KnowledgeError('invalid_source_manifest') from exc

@@ -103,6 +103,13 @@ class ChatService:
                     content=json.dumps(result,ensure_ascii=False)
                     await self.repo.append_message(cid,'tool',content,tool_call_id=call['id'])
                     current.append(ToolMessage(content=content,tool_call_id=call['id']))
+                    if (index==0 and call['name'] in ('query_order','query_logistics')
+                            and result.get('ok') and result['data'].get('found')):
+                        yield StreamEvent('order_card',result['data'])
+                    if (index==0 and call['name']=='query_faq'
+                            and call['args'].get('scope')=='current_order_product'
+                            and result.get('ok') and result['data'].get('found')):
+                        yield StreamEvent('knowledge_sources',{'items':result['data']['items']})
                 final_messages=trim_turns(self.system,turn.turns,current,self.settings.input_budget)
                 upstream=self.model.bind(tool_choice='none').astream(final_messages) # Explicitly forbid another tool call.
                 answer='';reason=None

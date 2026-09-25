@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>订单详情 · 知遇智能客服</title><link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/order.css"><script src="/static/order.js" defer></script>
+</head>
+<body>
+  <main class="order-page">
+    <a class="back-link" href="/">← 返回客服对话</a>
+    <header><div><p class="eyebrow">ORDER DETAILS</p><h1>订单详情</h1></div><span class="demo-label">演示数据</span></header>
+    <p id="status" class="status" role="status">正在读取订单…</p>
+    <section id="content" hidden>
+      <div class="order-number" id="order-number"></div>
+      <section class="panel">
+        <h2>商品与支付</h2>
+        <div id="items"></div>
+        <dl id="summary"></dl>
+      </section>
+      <section class="panel">
+        <h2>配送进度</h2>
+        <p id="shipping-status"></p>
+        <p id="eta"></p>
+        <ol id="timeline" class="timeline"></ol>
+      </section>
+      <p class="disclaimer">本页为固定演示订单，不代表安克真实订单或物流信息。</p>
+    </section>
+  </main>
+</body>
+</html>
