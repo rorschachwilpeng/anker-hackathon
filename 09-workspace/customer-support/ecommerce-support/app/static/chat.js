@@ -50,6 +50,7 @@ function reset(next=mode) {
   $('image-feedback').textContent=''; $('composer').classList.remove('dragging');
   $('drop-mask').hidden=true; dragDepth=0; closeImageMenu();
   mode=next; conversationId=null; $('messages').replaceChildren(); $('welcome').hidden=false; $('message').value='';
+  $('s1pro-status').hidden=true; $('s1pro-status').textContent='';
   $('image-tools').hidden=mode!=='s1pro';
   $('announcement').textContent='已开始新对话';
   $('page-title').textContent=titles[mode];
@@ -99,6 +100,18 @@ function showExtraction(data,view) {
   }
   const details=document.createElement('details'); const summary=document.createElement('summary');summary.textContent='查看 JSON';const pre=document.createElement('pre');pre.textContent=JSON.stringify(data,null,2);details.append(summary,pre);view.article.append(list,details);scrollDown();
 }
+const s1proStages={clarify_product:'确认产品中',ask_symptom:'了解故障现象',ask_feedback:'等待您的反馈',confirm_ticket:'等待建单确认',ticket_created:'工单已创建',ticket_failed:'建单未成功',resolved:'问题已解决',no_answer:'暂无对应官方资料',degraded:'服务暂时降级'};
+function updateS1ProStatus(progress,stage) {
+  const bar=$('s1pro-status');
+  if (mode!=='s1pro'||!progress) { bar.hidden=true; return; }
+  const parts=[progress.product?`已确认：${progress.product}`:'产品：待确认'];
+  if (progress.symptom) parts.push(`症状：${progress.symptom}`);
+  parts.push(`已建议 ${progress.suggested} 步 · 已尝试 ${progress.tried} 步`);
+  parts.push(`阶段：${stage}`);
+  if (Array.isArray(progress.sources)&&progress.sources.length) parts.push(`来源：${progress.sources[progress.sources.length-1]}`);
+  if (progress.ticket_no) parts.push(`工单：${progress.ticket_no}`);
+  bar.textContent=parts.join(' ｜ '); bar.hidden=false;
+}
 function showS1Pro(data,view) {
   if (!Number.isSafeInteger(data.conversation_id) || typeof data.reply !== 'string') throw new Error('服务回复格式异常。');
   conversationId=data.conversation_id; view.bubble.textContent=data.reply;
@@ -106,8 +119,13 @@ function showS1Pro(data,view) {
     const link=document.createElement('a'); link.href=data.source.url; link.textContent=`资料来源：${data.source.title}`;
     link.target='_blank'; link.rel='noopener noreferrer'; view.article.append(link);
   }
-  const status=data.action==='ticket_created'?'创建成功':data.action==='ticket_failed'?'创建失败':'待确认';
-  note(view,`服务动作：${data.action} · 工单状态：${status}`);
+  if (typeof data.ticket_url==='string' && data.ticket_url.startsWith('/s1pro/tickets/')) {
+    const link=document.createElement('a'); link.href=data.ticket_url; link.textContent='查看工单进度（本地演示）';
+    link.target='_blank'; link.rel='noopener noreferrer'; link.className='ticket-link'; view.article.append(link);
+  }
+  const stage=s1proStages[data.action]||'处理中';
+  note(view,`当前阶段：${stage}`);
+  updateS1ProStatus(data.progress,stage);
 }
 function closeImageMenu() {
   $('add-menu').hidden=true;
