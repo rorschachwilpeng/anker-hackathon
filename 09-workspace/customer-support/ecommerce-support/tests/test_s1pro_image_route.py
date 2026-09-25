@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -20,6 +22,7 @@ class Flow:
         *,
         observation: VisualObservation | None = None,
         image_failed: bool = False,
+        events=None,
     ) -> dict[str, object]:
         self.calls.append(
             {
@@ -175,18 +178,25 @@ def test_missing_vision_client_degrades_to_flow() -> None:
     assert flow.calls[0]["image_failed"] is True
 
 
-def test_json_s1pro_route_remains_unchanged() -> None:
+def test_s1pro_chat_streams_result_event_with_response_fields() -> None:
     flow = Flow()
 
     with make_client(flow) as client:
         response = client.post("/s1pro/chat", json={"message": "S1 Pro 不吸了"})
 
     assert response.status_code == 200
-    assert set(response.json()) == {
+    assert response.headers["content-type"].startswith("text/event-stream")
+    result = None
+    for block in response.text.split("\n\n"):
+        lines = block.strip().splitlines()
+        if len(lines) >= 2 and lines[0] == "event: result":
+            result = json.loads(lines[1][5:].strip())
+    assert result is not None
+    assert {
         "conversation_id",
         "action",
         "reply",
         "source",
         "ticket_no",
-    }
+    } <= set(result)
     assert len(flow.calls) == 1

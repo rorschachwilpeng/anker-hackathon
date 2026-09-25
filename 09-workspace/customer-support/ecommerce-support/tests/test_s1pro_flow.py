@@ -533,3 +533,54 @@ async def test_notice_is_none_without_image_failure():
     first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
     assert first['action']=='ask_feedback'
     assert first['notice'] is None
+
+
+class HumanUnderstanding(Understanding):
+    async def interpret(self,message,state):
+        result=await super().interpret(message,state)
+        if '人工' in message or '真人' in message:
+            result['human_request']=True
+        return result
+
+
+async def test_stage_events_are_emitted_at_real_wait_points():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,Understanding(),Search())
+    seen=[]
+    async def collect(payload):seen.append(payload)
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了',events=collect)
+    assert [payload['type'] for payload in seen]==['stage','stage','search_done']
+    assert seen[0]['stage']=='understanding' and seen[1]['stage']=='searching'
+    assert seen[2]['title']=='Official suction help'
+    second=await flow.handle('还是不行',first['conversation_id'])
+    assert second['action']=='ask_feedback'
+
+
+async def test_human_request_goes_straight_to_ticket_confirmation():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,HumanUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    ask=await flow.handle('别折腾了，我要找人工客服',cid)
+    assert ask['action']=='confirm_ticket'
+    assert '转人工' in ask['reply'] and '本地演示记录' in ask['reply']
+    created=await flow.handle('可以建单',cid)
+    assert created['action']=='ticket_created'
+
+
+async def test_human_request_counts_as_consent_during_confirmation():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,HumanUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    created=await flow.handle('我要转人工',cid)
+    assert created['action']=='ticket_created'
+
+
+async def test_human_request_before_product_confirmation_still_clarifies():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,HumanUnderstanding(),Search())
+    first=await flow.handle('我要找人工客服')
+    assert first['action']=='clarify_product'

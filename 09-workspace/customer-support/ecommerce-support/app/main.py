@@ -121,11 +121,51 @@ def create_app(
         return {"status": "ok"}
 
     @application.post('/s1pro/chat')
-    async def s1pro_chat(request: ChatRequest) -> dict[str, Any]:
+    async def s1pro_chat(request: ChatRequest) -> StreamingResponse:
         flow=application.state.s1pro_flow
         if flow is None:raise HTTPException(503,'S1 Pro service is unavailable')
-        try:return await flow.handle(request.message,request.conversation_id)
-        except LookupError:raise HTTPException(404,'会话不存在。') from None
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def emit(payload: dict[str, Any]) -> None:
+            await queue.put(payload)
+
+        async def run() -> None:
+            try:
+                result = await flow.handle(request.message, request.conversation_id, events=emit)
+                await queue.put({'type': 'result', 'data': result})
+            except LookupError:
+                await queue.put({'type': 'error', 'message': '会话不存在。', 'code': 'conversation_not_found'})
+            except Exception:
+                await queue.put({'type': 'error', **UPSTREAM_ERROR})
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(run())
+
+        async def events():
+            try:
+                while True:
+                    payload = await queue.get()
+                    if payload is None:
+                        return
+                    kind = payload.get('type')
+                    if kind == 'result':
+                        yield _sse('result', payload['data'])
+                    elif kind == 'stage':
+                        yield _sse('stage', payload)
+                    elif kind == 'search_done':
+                        yield _sse('search_done', payload)
+                    else:
+                        yield _sse('error', payload)
+            finally:
+                if not task.done():
+                    task.cancel()
+
+        return StreamingResponse(
+            events(),
+            media_type='text/event-stream',
+            headers={'Cache-Control': 'no-cache'},
+        )
 
     @application.post('/s1pro/chat/image')
     async def s1pro_chat_image(
