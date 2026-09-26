@@ -10,7 +10,10 @@ class TurnUnderstanding(BaseModel):
     feedback: Literal['resolved', 'unresolved'] | None = None
     ticket_consent: bool | None = None
     urgency: Literal['urgent'] | None = None
+    urgency_reason: str | None = None
     human_request: bool | None = None
+    frustration: bool | None = None
+    gratitude: bool | None = None
 
 
 class S1ProUnderstanding:
@@ -24,7 +27,10 @@ class S1ProUnderstanding:
                 "feedback 仅在明确说已恢复或仍未解决时填 resolved/unresolved；"
                 "ticket_consent 仅在明确同意创建工单时为 true；"
                 "urgency 仅在用户明确表达急迫（如“急着用”“尽快”“马上要用”“很着急”）时填 urgent；"
-                "human_request 仅在用户明确要求转人工或找真人客服时为 true。")
+                "urgency_reason 在用户表达急迫且说明具体原因时，提取简短原因短语（如“明天要请客”），未说明则为 null；"
+                "human_request 仅在用户明确要求转人工或找真人客服时为 true；"
+                "frustration 仅在用户明确表达沮丧、不耐烦或抱怨反复尝试无效时为 true；"
+                "gratitude 仅在用户明确道谢时为 true。")
         result=await self.extractor.ainvoke([SystemMessage(prompt),HumanMessage(message)])
         parsed=result if isinstance(result,TurnUnderstanding) else TurnUnderstanding.model_validate(result)
         return {**parsed.model_dump(),'ticket_consent':parsed.ticket_consent is True}

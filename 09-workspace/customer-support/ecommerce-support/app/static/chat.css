@@ -46,3 +46,6 @@
 .quick-replies { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
 .quick-reply { padding:6px 14px; border:1px solid var(--line); border-radius:16px; background:#fff; color:#40584a; font-size:13px; cursor:pointer; }
 .quick-reply:hover { background:#eef4ee; }
+.assistant .speaker::before { content:"知"; display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:var(--accent); color:#fff; font-size:9px; margin-right:6px; vertical-align:-3px; }
+.bubble.pending { animation:breathe 1.6s ease-in-out infinite; color:var(--muted); }
+@keyframes breathe { 0%,100% { opacity:.45 } 50% { opacity:1 } }

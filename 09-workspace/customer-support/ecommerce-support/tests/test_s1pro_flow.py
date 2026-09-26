@@ -1,5 +1,6 @@
 from dataclasses import asdict
 
+from app.s1pro import messages as copy
 from app.s1pro.state import S1ProState
 
 
@@ -201,7 +202,7 @@ async def test_unresolved_without_keywords_advances_to_next_step():
     follow=await flow.handle('试过了，没什么变化',cid)
     assert follow['action']=='ask_feedback'
     assert '胶条' in follow['reply']
-    assert follow['reply']!='试过之后怎么样，吸力回来点了吗？'
+    assert follow['reply'] not in copy.ASK_FEEDBACK_RETRIES
 
 
 async def test_resolved_via_model_without_keywords():
@@ -261,7 +262,7 @@ async def test_s1_pro_alias_in_visible_model_code_is_not_a_conflict():
     )
 
     assert first['action']=='clarify_product'
-    assert first['reply']=='好，这个问题我来帮您查。先对一下：您用的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人，对吗？'
+    assert first['reply'] in copy.CLARIFY_PRODUCT_T2080S
     assert repo.states[first['conversation_id']].pending_model_candidate=='T2080'
     assert search.calls==[]
 
@@ -409,7 +410,7 @@ async def test_image_only_unknown_candidate_keeps_generic_symptom_request():
     repo=Repo();search=Search();flow=S1ProFlow(repo,Understanding(),search)
     first=await flow.handle('',observation=observation('unknown',visible_text=['模糊文字'],visible_clues=['无法辨认']))
     assert first['action']=='ask_symptom'
-    assert first['reply']=='告诉我产品型号和它现在的问题，我来帮您想办法。'
+    assert first['reply'] in copy.ASK_SYMPTOM_IMAGE_ONLYS
     assert search.calls==[]
 
 
@@ -584,3 +585,80 @@ async def test_human_request_before_product_confirmation_still_clarifies():
     repo=Repo();flow=S1ProFlow(repo,HumanUnderstanding(),Search())
     first=await flow.handle('我要找人工客服')
     assert first['action']=='clarify_product'
+
+
+class EmotionalUnderstanding(Understanding):
+    async def interpret(self,message,state):
+        result=await super().interpret(message,state)
+        if any(word in message for word in ('急','赶紧','马上','尽快')):
+            result['urgency']='urgent'
+            if '请客' in message:
+                result['urgency_reason']='明天要请客'
+        if '烦' in message or '折腾' in message:
+            result['frustration']=True
+        if '谢' in message:
+            result['gratitude']=True
+        return result
+
+
+async def test_frustration_after_two_failed_steps_offers_human():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,EmotionalUnderstanding(),search)
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    await flow.handle('还是不行',cid)
+    second=await flow.handle('还是不行，试来试去真烦',cid)
+    assert second['action']=='confirm_ticket'
+    assert second['reply']==copy.CONFIRM_TICKET_FRUSTRATION
+    assert '可以建单' in second['reply']
+    assert len(search.calls)==2
+    created=await flow.handle('可以建单',cid)
+    assert created['action']=='ticket_created'
+
+
+async def test_single_failure_with_frustration_still_suggests_next_step():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,EmotionalUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    second=await flow.handle('还是不行，有点烦',cid)
+    assert second['action']=='ask_feedback'
+
+
+async def test_gratitude_after_resolution_gets_warm_acknowledgement():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();search=Search();flow=S1ProFlow(repo,EmotionalUnderstanding(),search)
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了')
+    cid=first['conversation_id']
+    done=await flow.handle('清理后好了',cid)
+    assert done['action']=='resolved'
+    calls_before=len(search.calls)
+    thanks=await flow.handle('太感谢了',cid)
+    assert thanks['action']=='resolved'
+    assert thanks['reply'] in copy.GRATITUDE_ACKS
+    assert len(search.calls)==calls_before
+
+
+async def test_urgency_reason_is_recalled_in_resolution_and_ticket():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,EmotionalUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了，明天要请客急着用')
+    cid=first['conversation_id']
+    assert repo.states[cid].urgency_reason=='明天要请客'
+    done=await flow.handle('清理后好了',cid)
+    assert done['action']=='resolved'
+    assert '明天要请客' in done['reply'] and '不会再犯' in done['reply']
+
+
+async def test_ticket_description_has_handoff_summary_with_reason():
+    from app.s1pro.flow import S1ProFlow
+    repo=Repo();flow=S1ProFlow(repo,EmotionalUnderstanding(),Search())
+    first=await flow.handle('我的 eufy 扫地机器人 S1 Pro 不吸了，明天要请客急着用')
+    cid=first['conversation_id']
+    await flow.handle('还是不行',cid)
+    await flow.handle('还是不行',cid)
+    created=await flow.handle('可以建单',cid)
+    description=repo.tickets[created['ticket_no']]['description']
+    assert description.startswith('交接摘要：用户自述明天要请客，')
+    assert '建议人工优先回电跟进' in description
+    assert '用户急迫表达：有（用户明确表示着急：明天要请客）' in description

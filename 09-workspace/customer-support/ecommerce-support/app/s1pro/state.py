@@ -13,6 +13,7 @@ class S1ProState:
     sources: list[dict[str, str]] = field(default_factory=list)
     feedback: str | None = None
     urgent: bool = False
+    urgency_reason: str | None = None
     awaiting: Literal['product', 'symptom', 'feedback', 'ticket_confirmation'] | None = None
     ticket_no: str | None = None
 

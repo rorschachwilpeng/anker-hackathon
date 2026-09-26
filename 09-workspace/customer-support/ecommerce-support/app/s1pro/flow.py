@@ -88,9 +88,13 @@ class S1ProFlow:
 
         def capture_urgency(understood):
             nonlocal urgent_notice
-            if understood.get('urgency')=='urgent' and not state.urgent:
-                state.urgent=True
-                urgent_notice=copy.URGENT_NOTICE
+            if understood.get('urgency')=='urgent':
+                reason=understood.get('urgency_reason')
+                if reason and not state.urgency_reason:
+                    state.urgency_reason=str(reason)[:50]
+                if not state.urgent:
+                    state.urgent=True
+                    urgent_notice=copy.URGENT_NOTICE
 
         async def create_ticket():
             number=await self.repo.reserve_s1pro_ticket(conversation_id)
@@ -104,8 +108,20 @@ class S1ProFlow:
                              +state.visual_observation.get('uncertainties',[]))
             visual_summary=(f'图片提示（未核实）：{"；".join(visual_cues) or "无可读线索"}；'
                             if state.visual_observation else '')
-            description=(f'产品型号：T2080；原始诉求：{original}；症状：{state.symptom or "待确认"}；'
-                         f'用户急迫表达：{"有（用户明确表示着急）" if state.urgent else "无"}；'
+            if state.urgency_reason:
+                urgency_line=f'有（用户明确表示着急：{state.urgency_reason}）'
+                urgency_clause=f'用户自述{state.urgency_reason}，'
+            elif state.urgent:
+                urgency_line='有（用户明确表示着急）'
+                urgency_clause='用户明确表示着急，'
+            else:
+                urgency_line='无'
+                urgency_clause=''
+            handoff=(f'交接摘要：{urgency_clause}eufy S1 Pro（T2080）出现“{state.symptom or "待确认"}”，'
+                     f'已按官方资料尝试 {len(state.completed_steps)} 步仍未解决，建议人工优先回电跟进。')
+            description=(handoff+
+                         f'产品型号：T2080；原始诉求：{original}；症状：{state.symptom or "待确认"}；'
+                         f'用户急迫表达：{urgency_line}；'
                          f'已建议步骤：{"、".join(state.suggested_steps) or "无"}；'
                          f'已尝试步骤：{"、".join(state.completed_steps) or "未反馈"}；'
                          f'用户反馈：{state.feedback or "未提供"}；'
@@ -135,7 +151,7 @@ class S1ProFlow:
                 capture_urgency(understood)
                 consent=understood.get('ticket_consent') is True or understood.get('human_request') is True
             if not consent:
-                return await respond('confirm_ticket',copy.CONFIRM_TICKET_ASK)
+                return await respond('confirm_ticket',copy.pick(copy.CONFIRM_TICKET_ASKS,conversation_id))
             return await create_ticket()
 
         affirmative_confirmation=(
@@ -155,6 +171,9 @@ class S1ProFlow:
         else:
             understood={}
 
+        if understood.get('gratitude') and state.feedback=='已恢复正常':
+            return await respond('resolved',copy.pick(copy.GRATITUDE_ACKS,conversation_id))
+
         if state.symptom is None:
             state.symptom=understood.get('symptom_candidate')
 
@@ -167,7 +186,7 @@ class S1ProFlow:
                 seen='、'.join((observation.visible_text+observation.visible_clues)[:3])
                 if seen:
                     return await respond('ask_symptom',copy.ask_symptom_with_clues(seen))
-            return await respond('ask_symptom',copy.ASK_SYMPTOM_IMAGE_ONLY)
+            return await respond('ask_symptom',copy.pick(copy.ASK_SYMPTOM_IMAGE_ONLYS,conversation_id))
 
         explicit_product=_explicit_product(message)
         text_candidate=understood.get('product_candidate')
@@ -204,7 +223,7 @@ class S1ProFlow:
                         state.pending_model_candidate='T2080'
                 state.awaiting='product'
                 if state.pending_model_candidate=='T2080':
-                    reply=copy.CLARIFY_PRODUCT_T2080
+                    reply=copy.pick(copy.CLARIFY_PRODUCT_T2080S,conversation_id)
                 elif state.visual_observation and state.visual_observation.get('candidate_model')=='unknown':
                     reply=copy.CLARIFY_PRODUCT_IMAGE_UNKNOWN
                 else:
@@ -216,7 +235,7 @@ class S1ProFlow:
 
         if state.ticket_no is None and understood.get('human_request'):
             state.awaiting='ticket_confirmation'
-            return await respond('confirm_ticket',copy.CONFIRM_TICKET_HUMAN_REQUEST)
+            return await respond('confirm_ticket',copy.pick(copy.CONFIRM_TICKET_HUMAN_REQUESTS,conversation_id))
 
         if state.awaiting is None and state.ticket_no is None and understood.get('ticket_consent'):
             return await create_ticket()
@@ -225,11 +244,11 @@ class S1ProFlow:
             state.symptom=understood.get('symptom_candidate')
         if state.symptom is None and (state.visual_observation is not None or had_awaiting_symptom):
             state.awaiting='symptom'
-            return await respond('ask_symptom',copy.ASK_SYMPTOM)
+            return await respond('ask_symptom',copy.pick(copy.ASK_SYMPTOMS,conversation_id))
         if state.symptom!='吸力变弱':
             state.awaiting=None
             return await respond(
-                'no_answer',copy.NO_ANSWER,
+                'no_answer',copy.pick(copy.NO_ANSWERS,conversation_id),
                 source={'title':'eufy：解决技术问题需要提供的信息',
                         'url':'https://service.eufy.com/eu/article-description/What-information-does-eufy-need-to-resolve-a-technical-issue-with-my-S1-Pro'},
             )
@@ -238,14 +257,19 @@ class S1ProFlow:
             feedback=understood.get('feedback')
             if feedback=='resolved' or (feedback is None and any(word in message for word in ('好了','恢复','正常','解决'))):
                 state.feedback='已恢复正常';state.awaiting=None
-                return await respond('resolved',copy.RESOLVED,
+                reply=(copy.resolved_with_reason(state.urgency_reason) if state.urgency_reason
+                       else copy.pick(copy.RESOLVEDS,conversation_id))
+                return await respond('resolved',reply,
                                      source=state.sources[-1] if state.sources else None)
             if feedback!='unresolved' and not any(word in message for word in ('不行','没用','无效','仍然','还是')):
-                return await respond('ask_feedback',copy.ASK_FEEDBACK_RETRY)
+                return await respond('ask_feedback',copy.pick(copy.ASK_FEEDBACK_RETRIES,conversation_id+len(state.completed_steps)))
             state.feedback=message
             if state.suggested_steps:
                 latest=state.suggested_steps[-1]
                 if latest not in state.completed_steps:state.completed_steps.append(latest)
+            if understood.get('frustration') and len(state.completed_steps)>=2:
+                state.awaiting='ticket_confirmation'
+                return await respond('confirm_ticket',copy.CONFIRM_TICKET_FRUSTRATION)
 
         tools=build_s1pro_tools(self.knowledge_search)
         await emit({'type':'stage','stage':'searching'})
@@ -265,11 +289,11 @@ class S1ProFlow:
         next_step=next((item for item in steps if item['answer'] not in state.suggested_steps),None)
         if next_step is None:
             state.awaiting='ticket_confirmation'
-            return await respond('confirm_ticket',copy.CONFIRM_TICKET_STEPS_EXHAUSTED)
+            return await respond('confirm_ticket',copy.pick(copy.CONFIRM_TICKET_STEPS_EXHAUSTEDS,conversation_id))
         first_step=not state.suggested_steps
         state.suggested_steps.append(next_step['answer'])
         state.awaiting='feedback'
         source={'title':next_step['source_title'],'url':next_step['source_url']}
         if source not in state.sources:state.sources.append(source)
         await emit({'type':'search_done','title':next_step['source_title'],'url':next_step['source_url']})
-        return await respond('ask_feedback',copy.suggest_step(next_step['answer'],first_step),source=source)
+        return await respond('ask_feedback',copy.suggest_step(next_step['answer'],first_step,seed=conversation_id+len(state.suggested_steps)),source=source)

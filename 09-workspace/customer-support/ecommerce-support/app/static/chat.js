@@ -120,6 +120,7 @@ async function streamChat(response,view) {
         if(event==='error') throw new Error(data.message || '回复中断，请重试。');
         if(event==='token') {
           if(typeof data.text!=='string') throw new Error('回复格式异常，请重试。');
+          view.bubble.classList.remove('pending');
           answer+=data.text; view.bubble.textContent=answer; scrollDown();
         }
         if(event==='done') {reason=data.finish_reason; if(!['stop','length'].includes(reason)) throw new Error('回复未正常结束，请重试。'); finished=true; break;}
@@ -132,6 +133,7 @@ async function streamChat(response,view) {
 }
 function showExtraction(data,view) {
   if(!data || Object.keys(data).sort().join(',')!=='expected_solution,order_id,request_type' || !Object.hasOwn(types,data.request_type) || ![data.order_id,data.expected_solution].every(v=>v===null||typeof v==='string')) throw new Error('提取结果格式异常，请重试。');
+  view.bubble.classList.remove('pending');
   view.bubble.textContent='已整理这段售后描述';
   const list=document.createElement('dl'); list.className='result-fields';
   for(const [label,value] of [['订单号',data.order_id],['诉求类型',types[data.request_type]],['期望方案',data.expected_solution]]) {
@@ -197,7 +199,7 @@ function renderS1ProQuickReplies(view,awaiting) {
 }
 function showS1Pro(data,view) {
   if (!Number.isSafeInteger(data.conversation_id) || typeof data.reply !== 'string') throw new Error('服务回复格式异常。');
-  conversationId=data.conversation_id; view.bubble.textContent=data.reply;
+  conversationId=data.conversation_id; view.bubble.classList.remove('pending'); view.bubble.textContent=data.reply;
   if (typeof data.notice==='string' && data.notice) note(view,data.notice);
   if (data.source?.url && data.source?.title) {
     const link=document.createElement('a'); link.href=data.source.url; link.textContent=`资料来源：${data.source.title}`;
@@ -253,6 +255,7 @@ async function submit(event) {
   $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在生成回复':'正在提取售后信息';
   addMessage('user',message,submittedImage?{url:submittedPreviewUrl}:null);
   const view=addMessage('assistant',submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在思考…':submittedMode==='s1pro'?'正在理解您的描述…':'正在整理…');
+  view.bubble.classList.add('pending');
   if(submittedImage) clearImageDraft({revoke:false});
   let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},150000);
   try {
@@ -276,6 +279,7 @@ async function submit(event) {
     else showExtraction(await response.json(),view);
     $('announcement').textContent='回复完成';
   } catch(error) {
+    view.bubble.classList.remove('pending');
     if(['正在思考…','正在整理…','正在识别图片并整理可见线索…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
     const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
     for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
