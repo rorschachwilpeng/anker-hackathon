@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>知遇 · 智能客服</title><link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/chat.css"><script src="/static/chat.js" defer></script>
+</head>
+<body>
+<div class="workspace">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="知遇首页"><span class="brand-symbol">知</span><span>知遇 <small>智能客服</small></span></a>
+    <button class="new-chat" id="new-chat"><span aria-hidden="true">＋</span> 新对话</button>
+    <div class="nav-label">工作空间</div>
+    <nav aria-label="功能导航">
+      <button class="nav-item selected" id="chat-mode" aria-current="page"><span aria-hidden="true">◌</span> 客服对话 <span class="nav-arrow" aria-hidden="true">↗</span></button>
+      <button class="nav-item" id="extract-mode"><span aria-hidden="true">▤</span> 售后提取</button>
+      <button class="nav-item" id="s1pro-mode"><span aria-hidden="true">✳</span> S1 Pro 售后演示</button>
+      <a class="nav-item" href="/s1pro/workbench"><span aria-hidden="true">▤</span> 本地客服工单</a>
+    </nav>
+    <div class="sidebar-note"><span class="note-label">让沟通更简单</span><p>从一个问题开始，<br>一起找到解决办法。</p></div>
+    <div class="sidebar-foot"><span class="avatar">我</span><span>本地工作空间<small>对话仅保留在当前页面</small></span></div>
+  </aside>
+  <main>
+    <header><div><span id="page-title">客服对话</span><span class="header-tag">AI 助手</span></div><span class="status" id="connection" role="status">正在连接</span></header>
+    <div class="s1pro-status" id="s1pro-status" role="status" hidden></div>
+    <section class="scroll-area" id="scroll-area" aria-label="对话内容">
+      <div class="welcome" id="welcome">
+        <div class="eyebrow">YOUR EVERYDAY SUPPORT</div>
+        <div class="welcome-mark" aria-hidden="true">✳</div>
+        <h1 id="welcome-title">每一个问题，<br>都值得认真回应。</h1>
+        <p id="welcome-description">退换货、物流、售后咨询，告诉我你遇到了什么。</p>
+        <div class="suggestions" id="suggestions">
+          <button data-prompt="收到的衣服尺码小了，我想换大一码，需要提供哪些信息？"><span>退换货咨询</span><small>尺码不合适，该怎么办？</small><b aria-hidden="true">↗</b></button>
+          <button data-prompt="我的包裹物流三天没有更新了，我可以怎么处理？"><span>物流问题</span><small>包裹迟迟没到，想了解进度</small><b aria-hidden="true">↗</b></button>
+          <button data-prompt="商品收到后发现有破损，我应该准备哪些售后材料？"><span>售后帮助</span><small>商品有问题，了解处理方式</small><b aria-hidden="true">↗</b></button>
+        </div>
+      </div>
+      <div class="messages" id="messages" role="log" aria-label="聊天消息" aria-live="polite" aria-relevant="additions"></div>
+    </section>
+    <div class="composer-area">
+      <form id="composer" class="composer">
+        <div class="drop-mask" id="drop-mask" hidden><div>松开以添加图片<small>仅支持一张 JPG 或 PNG，最大 5 MB</small></div></div>
+        <div class="attachment" id="attachment" hidden>
+          <img id="thumbnail" alt="待发送图片预览">
+          <div class="attachment-info"><strong id="file-name"></strong><small>未发送 · 仅本轮使用</small></div>
+          <button class="remove" id="remove-image" type="button" aria-label="移除图片">×</button>
+        </div>
+        <div class="feedback" id="image-feedback" role="alert" hidden></div>
+        <label class="sr-only" for="message">输入消息</label>
+        <textarea id="message" rows="2" maxlength="16000" placeholder="说说你的问题，我来帮你一起解决…"></textarea>
+        <div class="composer-bottom">
+          <div class="add-wrap" id="image-tools" hidden>
+            <button class="add-button" id="add-image" type="button" aria-label="添加图片" aria-expanded="false" aria-controls="add-menu">＋</button>
+            <div class="add-menu" id="add-menu" hidden>
+              <div class="add-menu-title">添加</div>
+              <button class="upload-option" id="choose-image" type="button"><span class="folder-icon" aria-hidden="true"></span>上传图片</button>
+            </div>
+          </div>
+          <span id="input-hint">Enter 发送 · Shift + Enter 换行</span>
+          <button id="send" type="submit" disabled aria-label="发送消息">发送 <span aria-hidden="true">↑</span></button>
+          <button id="stop" type="button" hidden>停止生成 <span aria-hidden="true">■</span></button>
+        </div>
+        <input id="image-file" class="sr-only" type="file" accept="image/png,image/jpeg" aria-label="选择图片">
+      </form>
+      <div class="footnote">AI 回复仅供参考，实际售后处理请以商家确认为准。</div>
+      <div class="sr-only" id="announcement" role="status"></div>
+    </div>
+  </main>
+</div>
+<dialog id="source-dialog" class="source-dialog" aria-labelledby="source-title">
+  <div class="source-head"><span>知识来源</span><button type="button" id="source-close" aria-label="关闭来源">×</button></div>
+  <h2 id="source-title"></h2><p id="source-path"></p><div id="source-content" class="source-content"></div>
+</dialog>
+<script>document.getElementById('source-close').onclick=()=>document.getElementById('source-dialog').close();</script>
+</body>
+</html>

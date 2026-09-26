@@ -1,6 +1,6 @@
 # 多 Agent 分工表
 
-最后更新：2026-09-23
+最后更新：2026-09-25
 
 ## 目的
 
@@ -12,11 +12,13 @@
 
 长期角色必须通过下表中的线程 ID 寻址，不能只凭标题、列表顺序或当前目录判断身份。
 
-| 角色 | 唯一有效线程 | 当前工作树 | 状态 |
+| 角色 | 唯一有效线程 | 正式写入目录 | 状态 |
 | --- | --- | --- | --- |
-| Product Lead | `01a0adb4-b39f-7070-a581-771cda40c4a7` | `~/.codex/worktrees/5648/anker-ghost-in-the-shell-hackathon` | 有效；用户于 2026-09-23 明确要求继续使用当前对话负责产品与派单 |
-| Technical Builder | `01a0b4e1-f4df-7133-8075-03f34c242983` | `~/.codex/worktrees/9a8c/anker-ghost-in-the-shell-hackathon` | 有效 |
-| 售后调研 Agent | `01a0cd9b-a0cf-70c2-9391-5b714351e54d` | `~/.codex/worktrees/aeb6/anker-ghost-in-the-shell-hackathon` | 有效；已启动首轮调研 |
+| Product Lead | `01a0adb4-b39f-7070-a581-771cda40c4a7` | 项目根目录 | 有效；负责产品定义与验收 |
+| Technical Builder | `01a0b4e1-f4df-7133-8075-03f34c242983` | 项目根目录 | 有效；负责实现与技术验证 |
+| 售后调研 Agent | `01a0cd9b-a0cf-70c2-9391-5b714351e54d` | 项目根目录 | 有效；负责证据与研究 |
+
+项目根目录是 `/Users/pengyoutian/Desktop/彭祐天的Github/Wiki_of_Tian/projects/anker-hackathon`，日常工作分支是 `codex/product-agent-development`。Codex 任务若还显示旧工作树，那只是任务的历史启动目录；正式写入必须显式使用项目根目录。总控 Agent 也遵守同一规则。旧工作树只保留用于核对与回退，不再承接新成果。
 
 新增、替换或恢复长期线程前，总控必须先核对本表与现有线程列表；只有确认原线程已归档、损坏或无法恢复，才能创建替代线程，并在派发第一项任务前更新本表。Product Lead 和 Technical Builder 不得自行 fork 或新建对方角色作为临时替代。
 
@@ -38,7 +40,6 @@
 | Project Manager | 不启用 | 最小必要的推进与排期由 Product Lead 承担；跨角色阻塞才升级总控 |
 | 交付 Agent | 不启用 | Demo 叙事由 Product Lead 负责，代码与技术验证由 Technical Builder 负责 |
 | 独立协调 Agent | 不启用 | Product Lead 与 Technical Builder 直接通过仓库文档交接；职责冲突升级总控 |
-| Ghost in the Shell Hackathon｜调研 Agent | 不作为当前长期执行线程 | 既有研究成果继续作为证据输入；出现明确的深圳专项任务时再按单次任务启用，不参与 Anker 日常推进 |
 
 不得在未修改本表的情况下新增长期角色，或将上述职责拆给第三个协调、管理或交付线程。
 
@@ -107,9 +108,9 @@
 1. Product Lead 与 Technical Builder 以确认版 Spec、技术接手审计和锁定版 MVP Spec 为三个正式交接物。
 2. 派单前先从“唯一线程登记”复制接收方线程 ID；不得因线程列表被截断、标题相似或暂时未显示，就 fork 当前线程或新建同名线程。
 3. 发起方写清目标、输入、输出、成功标准、允许写入范围和接收方；接收方只对会改变执行方向的缺口发起澄清。
-4. 工作树彼此隔离。正式交接物必须先提交到 Git，再用“提交哈希 + 文件路径 + 需要接收方执行的动作”通知对方。未跟踪文件、未提交改动和聊天摘要都不构成交接。
-5. 接收方开始工作前必须核对提交哈希和文件路径；看不到交接物时先报告版本或工作树问题，不得基于旧副本继续。
-6. 两个线程不在同一文件中并行写入。产品定义归 Product Lead，技术设计与实现归 Technical Builder；双方意见通过引用文件和明确变更项交接。
+4. 四个角色共用同一项目目录与日常工作分支。正式交接物必须先提交到 Git，再用“提交哈希 + 文件路径 + 需要接收方执行的动作”通知对方。未跟踪文件、未提交改动和聊天摘要都不构成交接。
+5. 接收方开始工作前必须核对提交哈希和文件路径；看不到交接物时先报告版本或目录问题，不得基于旧副本继续。
+6. 不同角色不在同一文件中并行写入。产品定义归 Product Lead，技术设计与实现归 Technical Builder；双方意见通过引用文件和明确变更项交接。
 7. Technical Builder 发现不可行时，不自行删除需求；必须提供约束、证据和至少一个可执行缩减选项，由 Product Lead 做产品取舍。
 8. Product Lead 调整产品范围时，不自行承诺技术工期；必须让 Technical Builder 重新确认受影响的工作量与风险。
 9. 双方能在既定边界内解决的问题不经过总控。只有职责冲突、跨项目依赖、重大风险或用户级决策才升级。
@@ -142,6 +143,6 @@
 
 | Agent | 状态 | 当前交付 | 下一交接 |
 | --- | --- | --- | --- |
-| Product Lead | S1 Pro 垂直切片 Spec 已确认，底座迁入 Plan 已提交；细化下一阶段 Plan | 验收底座迁入结果，审阅 S1 Pro 后续实施计划 | 将通过验收的下一阶段计划交给 Technical Builder |
-| Technical Builder | 已收到底座迁入正式交接；等待核对更新后的线程登记并明确接单 | 按 `23ef8e34ae76a8b616800c96eade21500bb5bec0` 的迁入 Plan 验证底座，不提前开发 S1 Pro 功能 | 回传实施分支提交、测试结果与消息→工具→数据库链路 |
-| 售后调研 Agent | 首轮调研进行中 | 竞对售后 Agent、Anker 当前售后处理方式及业务痛点调研 | 将研究结论与证据账本提交给 Product Lead，技术相关证据同步 Technical Builder |
+| Product Lead | 产品方案与配图已集中到日常工作分支，等待用户审阅 | 维护方案、范围和验收口径 | 变更后通知 Builder 核对技术影响 |
+| Technical Builder | S1 Pro 最新已提交实现已进入日常工作分支；技术接入审计已补入 | 维护可运行代码、测试与技术风险 | 向 Product Lead 回传实现提交和验收证据 |
+| 售后调研 Agent | 现有七份报告已进入日常工作分支 | 继续补充售后证据及明确证据缺口 | 向 Product Lead 交付可追溯研究结论 |
