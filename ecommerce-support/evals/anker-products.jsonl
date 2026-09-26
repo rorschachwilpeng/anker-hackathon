@@ -1,0 +1,22 @@
+{"case_id":"anker-01","query":"A110A 是多大容量，最高能输出多少瓦？","expected":"26,250mAh","expected_path":"Anker Charging / Prime Power Bank 26K 300W / A110A / 产品信息 / A110A 是什么产品？容量和功率是多少？"}
+{"case_id":"anker-02","query":"Prime 26K 连不上蓝牙怎么重新配？","expected":"长按充电宝按键 7 秒","expected_path":"Anker Charging / Prime Power Bank 26K 300W / A110A / 蓝牙连接排查 / A110A 连不上蓝牙，怎样重置蓝牙？"}
+{"case_id":"anker-03","query":"A110A 在美国买保修几年？","expected":"24 个月","expected_path":"Anker Charging / 美国退换与保修政策 / A110A 保修 / Anker Prime A110A 在美国保修多久？"}
+{"case_id":"anker-04","query":"A110A 整机补电最多多少瓦，需要几个口？","expected":"两个 USB-C 端口同时输入时，整机最高输入功率为 250W","expected_path":"Anker Charging / Prime Power Bank 26K 300W / A110A / 充电功率排查 / A110A 为什么达不到最高输入功率？"}
+{"case_id":"anker-05","query":"美国 Anker 官网买的充电宝 30 天能退吗？","expected":"购买后 30 天内申请退款","expected_path":"Anker Charging / 美国退换与保修政策 / 官方商城退货 / 在美国 Anker 官网购买后多久可以退货？"}
+{"case_id":"solix-01","query":"C1000 的容量和额定输出是多少？","expected":"1056Wh","expected_path":"Anker SOLIX / C1000 Portable Power Station / A1761 / 产品信息 / SOLIX C1000 A1761 的容量和输出是多少？"}
+{"case_id":"solix-02","query":"C1000 出现高温图标还可以继续用吗？","expected":"停止使用电源站","expected_path":"Anker SOLIX / C1000 Portable Power Station / A1761 / 温度与过载告警 / C1000 显示高温或低温图标怎么办？"}
+{"case_id":"solix-03","query":"美国买的 A1761 保修多久？","expected":"60 个月","expected_path":"Anker SOLIX / 美国退换与保修政策 / C1000 保修 / SOLIX C1000 A1761 在美国保修多久？"}
+{"case_id":"solix-04","query":"美国 SOLIX 官网买的 C1000 退货期多久？","expected":"购买后 30 天内申请换货或退款","expected_path":"Anker SOLIX / 美国退换与保修政策 / 退货政策 / 在美国 SOLIX 官网买的 C1000 多久可以退？"}
+{"case_id":"eufy-01","query":"S1 Pro 吸力突然很弱要清理哪里？","expected":"吸尘入口、边刷、滚刷、尘盒和滤网","expected_path":"eufy / Robot Vacuum Omni S1 Pro / T2080 / 吸力变弱 / S1 Pro T2080 吸力变弱怎样排查？"}
+{"case_id":"eufy-02","query":"扫地机报 E01 是什么问题？","expected":"毛发卡住滚刷","expected_path":"eufy / Robot Vacuum Omni S1 Pro / T2080 / 滚刷错误 / S1 Pro 报 E01 滚刷错误怎么办？"}
+{"case_id":"eufy-03","query":"美国的 S1 Pro 保修多少个月？","expected":"12 个月","expected_path":"eufy / 美国退换与保修政策 / RoboVac 保修 / eufy S1 Pro T2080 在美国保修多久？"}
+{"case_id":"eufy-04","query":"美国 eufy 官网买的扫地机几天内能退？","expected":"购买后 30 天内申请退款","expected_path":"eufy / 美国退换与保修政策 / 官方商城退货 / 美国 eufy 官网购买的 S1 Pro 多久可以退？"}
+{"case_id":"soundcore-01","query":"A3062 怎么恢复出厂设置？","expected":"电源键和音量加号键 5 秒","expected_path":"soundcore / Space One Pro / A3062 / 恢复出厂设置 / Space One Pro A3062 怎样重置？"}
+{"case_id":"soundcore-02","query":"美国买 Space One Pro 保修多久？","expected":"18 个月","expected_path":"soundcore / 美国退换与保修政策 / 耳机保修 / Space One Pro A3062 在美国保修多久？"}
+{"case_id":"soundcore-03","query":"美国 soundcore 官网耳机退货窗口是多少天？","expected":"购买后 30 天内申请退款","expected_path":"soundcore / 美国退换与保修政策 / 官方商城退货 / 美国 soundcore 官网购买的 Space One Pro 多久可以退？"}
+{"case_id":"eufymake-01","query":"E1 打印错位可能是哪里松了？","expected":"X 轴同步带松动","expected_path":"eufyMake / UV Printer E1 / X 轴皮带排查 / E1 打印图案错位或断色，怎样检查 X 轴同步带？"}
+{"case_id":"eufymake-02","query":"E1 的打印头保修多久？","expected":"打印头保修 3 个月","expected_path":"eufyMake / 美国退换与保修政策 / 主机与打印头保修 / eufyMake UV Printer E1 主机和打印头分别保修多久？"}
+{"case_id":"eufymake-03","query":"美国 E1 用过之后退货会收多少服务费？","expected":"已开封且使用过为 20%","expected_path":"eufyMake / 美国退换与保修政策 / 标准退货政策 / 美国 eufyMake 官网购买 E1 后多久可以退？"}
+{"case_id":"policy-01","query":"在经销商买的安克产品要找谁退款？","expected":"由销售方按其退货政策办理退款","expected_path":"Anker 五产品线 / 美国销售渠道与购买凭证 / 授权经销渠道 / 授权经销商买的产品由谁办理退货？"}
+{"case_id":"policy-02","query":"中国大陆买的 C1000 可以直接按美国 30 天政策退货吗？","expected":"不能直接套用美国政策","expected_path":"Anker 五产品线 / 美国销售渠道与购买凭证 / 地区边界 / 中国大陆或其他地区的订单可以直接套用美国退换政策吗？"}
+{"case_id":"scope-01","query":"Nebula X1 投影仪保修多久？","expected":null,"expected_path":null}

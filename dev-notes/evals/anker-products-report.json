@@ -1,0 +1,698 @@
+{
+  "evaluated_at": "2026-09-26T14:36:48.546923+00:00",
+  "collection": "knowledge_hybrid_v1",
+  "retrieval": "hybrid_rrf",
+  "embedding_model": "BAAI/bge-m3",
+  "rerank_model": "BAAI/bge-reranker-v2-m3",
+  "rerank_threshold": 0.036652312614023685,
+  "active_threshold": {
+    "name": "rerank_score_threshold",
+    "value": 0.036652312614023685
+  },
+  "passed": 22,
+  "total": 22,
+  "cases": [
+    {
+      "case_id": "anker-01",
+      "query": "A110A 是多大容量，最高能输出多少瓦？",
+      "expected": "26,250mAh",
+      "passed": true,
+      "matched_chunk_id": 332,
+      "top5": [
+        {
+          "chunk_id": 332,
+          "score": 0.9986433386802673,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 产品信息 / A110A 是什么产品？容量和功率是多少？"
+        },
+        {
+          "chunk_id": 335,
+          "score": 0.9889186024665833,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 充电功率排查 / A110A 为什么达不到最高输入功率？"
+        },
+        {
+          "chunk_id": 331,
+          "score": 0.8450983762741089,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A"
+        },
+        {
+          "chunk_id": 337,
+          "score": 0.8357529640197754,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 官方来源 / 这些 A110A 信息来自哪里？"
+        },
+        {
+          "chunk_id": 396,
+          "score": 0.7414511442184448,
+          "section_path": "Anker Demo / 产品知识覆盖范围 / 已收录产品 / 当前 Demo 知识库收录了哪些产品？"
+        }
+      ]
+    },
+    {
+      "case_id": "anker-02",
+      "query": "Prime 26K 连不上蓝牙怎么重新配？",
+      "expected": "长按充电宝按键 7 秒",
+      "passed": true,
+      "matched_chunk_id": 333,
+      "top5": [
+        {
+          "chunk_id": 333,
+          "score": 0.9963070154190063,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 蓝牙连接排查 / A110A 连不上蓝牙，怎样重置蓝牙？"
+        },
+        {
+          "chunk_id": 334,
+          "score": 0.654839813709259,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 固件升级排查 / A110A 固件升级失败怎么办？"
+        },
+        {
+          "chunk_id": 345,
+          "score": 0.08778486400842667,
+          "section_path": "Anker SOLIX / C1000 Portable Power Station / A1761 / 连接重置 / C1000 连不上 App，怎样重置蓝牙和 Wi-Fi？"
+        },
+        {
+          "chunk_id": 382,
+          "score": 0.05025103688240051,
+          "section_path": "soundcore / Space One Pro / A3062 / 连接问题 / Space One Pro 经常断连或无法配对怎么办？"
+        },
+        {
+          "chunk_id": 335,
+          "score": 0.03994966298341751,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 充电功率排查 / A110A 为什么达不到最高输入功率？"
+        }
+      ]
+    },
+    {
+      "case_id": "anker-03",
+      "query": "A110A 在美国买保修几年？",
+      "expected": "24 个月",
+      "passed": true,
+      "matched_chunk_id": 339,
+      "top5": [
+        {
+          "chunk_id": 339,
+          "score": 0.9980754852294922,
+          "section_path": "Anker Charging / 美国退换与保修政策 / A110A 保修 / Anker Prime A110A 在美国保修多久？"
+        },
+        {
+          "chunk_id": 351,
+          "score": 0.27591368556022644,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / C1000 保修 / SOLIX C1000 A1761 在美国保修多久？"
+        },
+        {
+          "chunk_id": 330,
+          "score": 0.21439948678016663,
+          "section_path": "Anker 五产品线官方知识包 / 产品清单"
+        },
+        {
+          "chunk_id": 385,
+          "score": 0.16385281085968018,
+          "section_path": "soundcore / 美国退换与保修政策 / 耳机保修 / Space One Pro A3062 在美国保修多久？"
+        }
+      ]
+    },
+    {
+      "case_id": "anker-04",
+      "query": "A110A 整机补电最多多少瓦，需要几个口？",
+      "expected": "两个 USB-C 端口同时输入时，整机最高输入功率为 250W",
+      "passed": true,
+      "matched_chunk_id": 335,
+      "top5": [
+        {
+          "chunk_id": 335,
+          "score": 0.9869325757026672,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 充电功率排查 / A110A 为什么达不到最高输入功率？"
+        },
+        {
+          "chunk_id": 332,
+          "score": 0.982585072517395,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 产品信息 / A110A 是什么产品？容量和功率是多少？"
+        },
+        {
+          "chunk_id": 331,
+          "score": 0.550635039806366,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A"
+        },
+        {
+          "chunk_id": 337,
+          "score": 0.48697614669799805,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 官方来源 / 这些 A110A 信息来自哪里？"
+        },
+        {
+          "chunk_id": 336,
+          "score": 0.2678622305393219,
+          "section_path": "Anker Charging / Prime Power Bank 26K 300W / A110A / 充电功率排查 / A110A 完全没电后为什么不能立即充电？"
+        }
+      ]
+    },
+    {
+      "case_id": "anker-05",
+      "query": "美国 Anker 官网买的充电宝 30 天能退吗？",
+      "expected": "购买后 30 天内申请退款",
+      "passed": true,
+      "matched_chunk_id": 340,
+      "top5": [
+        {
+          "chunk_id": 340,
+          "score": 0.9992038607597351,
+          "section_path": "Anker Charging / 美国退换与保修政策 / 官方商城退货 / 在美国 Anker 官网购买后多久可以退货？"
+        },
+        {
+          "chunk_id": 352,
+          "score": 0.9926552772521973,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 退货政策 / 在美国 SOLIX 官网买的 C1000 多久可以退？"
+        },
+        {
+          "chunk_id": 390,
+          "score": 0.8320457339286804,
+          "section_path": "Anker 五产品线 / 美国销售渠道与购买凭证 / 官方销售渠道 / 从哪里购买才能使用对应品牌的官方商城退货政策？"
+        },
+        {
+          "chunk_id": 341,
+          "score": 0.8255005478858948,
+          "section_path": "Anker Charging / 美国退换与保修政策 / 第三方渠道 / 在 Amazon 或经销商购买的 Anker 产品去哪里退货？"
+        },
+        {
+          "chunk_id": 338,
+          "score": 0.6709943413734436,
+          "section_path": "Anker Charging / 美国退换与保修政策"
+        }
+      ]
+    },
+    {
+      "case_id": "solix-01",
+      "query": "C1000 的容量和额定输出是多少？",
+      "expected": "1056Wh",
+      "passed": true,
+      "matched_chunk_id": 344,
+      "top5": [
+        {
+          "chunk_id": 344,
+          "score": 0.9942741990089417,
+          "section_path": "Anker SOLIX / C1000 Portable Power Station / A1761 / 产品信息 / SOLIX C1000 A1761 的容量和输出是多少？"
+        },
+        {
+          "chunk_id": 348,
+          "score": 0.11034029722213745,
+          "section_path": "Anker SOLIX / C1000 Portable Power Station / A1761 / 充电维护 / C1000 如何使用极速充电，长期都开极速模式好吗？"
+        },
+        {
+          "chunk_id": 349,
+          "score": 0.07831397652626038,
+          "section_path": "Anker SOLIX / C1000 Portable Power Station / A1761 / 官方来源 / 这些 C1000 信息来自哪里？"
+        },
+        {
+          "chunk_id": 330,
+          "score": 0.06769469380378723,
+          "section_path": "Anker 五产品线官方知识包 / 产品清单"
+        },
+        {
+          "chunk_id": 396,
+          "score": 0.040799811482429504,
+          "section_path": "Anker Demo / 产品知识覆盖范围 / 已收录产品 / 当前 Demo 知识库收录了哪些产品？"
+        }
+      ]
+    },
+    {
+      "case_id": "solix-02",
+      "query": "C1000 出现高温图标还可以继续用吗？",
+      "expected": "停止使用电源站",
+      "passed": true,
+      "matched_chunk_id": 346,
+      "top5": [
+        {
+          "chunk_id": 346,
+          "score": 0.9986967444419861,
+          "section_path": "Anker SOLIX / C1000 Portable Power Station / A1761 / 温度与过载告警 / C1000 显示高温或低温图标怎么办？"
+        },
+        {
+          "chunk_id": 347,
+          "score": 0.8665348887443542,
+          "section_path": "Anker SOLIX / C1000 Portable Power Station / A1761 / 温度与过载告警 / C1000 显示过载告警怎么办？"
+        },
+        {
+          "chunk_id": 345,
+          "score": 0.09757351130247116,
+          "section_path": "Anker SOLIX / C1000 Portable Power Station / A1761 / 连接重置 / C1000 连不上 App，怎样重置蓝牙和 Wi-Fi？"
+        }
+      ]
+    },
+    {
+      "case_id": "solix-03",
+      "query": "美国买的 A1761 保修多久？",
+      "expected": "60 个月",
+      "passed": true,
+      "matched_chunk_id": 351,
+      "top5": [
+        {
+          "chunk_id": 351,
+          "score": 0.9984982013702393,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / C1000 保修 / SOLIX C1000 A1761 在美国保修多久？"
+        },
+        {
+          "chunk_id": 350,
+          "score": 0.6107076406478882,
+          "section_path": "Anker SOLIX / 美国退换与保修政策"
+        },
+        {
+          "chunk_id": 385,
+          "score": 0.16505683958530426,
+          "section_path": "soundcore / 美国退换与保修政策 / 耳机保修 / Space One Pro A3062 在美国保修多久？"
+        },
+        {
+          "chunk_id": 339,
+          "score": 0.12424862384796143,
+          "section_path": "Anker Charging / 美国退换与保修政策 / A110A 保修 / Anker Prime A110A 在美国保修多久？"
+        },
+        {
+          "chunk_id": 330,
+          "score": 0.06643251329660416,
+          "section_path": "Anker 五产品线官方知识包 / 产品清单"
+        }
+      ]
+    },
+    {
+      "case_id": "solix-04",
+      "query": "美国 SOLIX 官网买的 C1000 退货期多久？",
+      "expected": "购买后 30 天内申请换货或退款",
+      "passed": true,
+      "matched_chunk_id": 352,
+      "top5": [
+        {
+          "chunk_id": 352,
+          "score": 0.9992192983627319,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 退货政策 / 在美国 SOLIX 官网买的 C1000 多久可以退？"
+        },
+        {
+          "chunk_id": 351,
+          "score": 0.9944682121276855,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / C1000 保修 / SOLIX C1000 A1761 在美国保修多久？"
+        },
+        {
+          "chunk_id": 350,
+          "score": 0.8249440789222717,
+          "section_path": "Anker SOLIX / 美国退换与保修政策"
+        },
+        {
+          "chunk_id": 353,
+          "score": 0.6153590679168701,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 退回电源站 / 退回 C1000 前要注意什么？"
+        },
+        {
+          "chunk_id": 354,
+          "score": 0.40029922127723694,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 地区与渠道限制 / C1000 可以全球联保吗？"
+        }
+      ]
+    },
+    {
+      "case_id": "eufy-01",
+      "query": "S1 Pro 吸力突然很弱要清理哪里？",
+      "expected": "吸尘入口、边刷、滚刷、尘盒和滤网",
+      "passed": true,
+      "matched_chunk_id": 358,
+      "top5": [
+        {
+          "chunk_id": 358,
+          "score": 0.9958848357200623,
+          "section_path": "eufy / Robot Vacuum Omni S1 Pro / T2080 / 吸力变弱 / S1 Pro T2080 吸力变弱怎样排查？"
+        },
+        {
+          "chunk_id": 361,
+          "score": 0.4634441137313843,
+          "section_path": "eufy / Robot Vacuum Omni S1 Pro / T2080 / 官方来源 / 这些 S1 Pro 信息来自哪里？"
+        },
+        {
+          "chunk_id": 360,
+          "score": 0.4569184482097626,
+          "section_path": "eufy / Robot Vacuum Omni S1 Pro / T2080 / 受困错误 / S1 Pro 报 E72 无法脱困怎么办？"
+        },
+        {
+          "chunk_id": 359,
+          "score": 0.23541808128356934,
+          "section_path": "eufy / Robot Vacuum Omni S1 Pro / T2080 / 滚刷错误 / S1 Pro 报 E01 滚刷错误怎么办？"
+        }
+      ]
+    },
+    {
+      "case_id": "eufy-02",
+      "query": "扫地机报 E01 是什么问题？",
+      "expected": "毛发卡住滚刷",
+      "passed": true,
+      "matched_chunk_id": 359,
+      "top5": [
+        {
+          "chunk_id": 359,
+          "score": 0.97446209192276,
+          "section_path": "eufy / Robot Vacuum Omni S1 Pro / T2080 / 滚刷错误 / S1 Pro 报 E01 滚刷错误怎么办？"
+        },
+        {
+          "chunk_id": 368,
+          "score": 0.11051411926746368,
+          "section_path": "eufyMake / UV Printer E1 / 产品识别 / eufyMake E1 是什么产品？"
+        },
+        {
+          "chunk_id": 369,
+          "score": 0.08548455685377121,
+          "section_path": "eufyMake / UV Printer E1 / X 轴皮带排查 / E1 打印图案错位或断色，怎样检查 X 轴同步带？"
+        },
+        {
+          "chunk_id": 376,
+          "score": 0.050923530012369156,
+          "section_path": "eufyMake / 美国退换与保修政策 / 耗材限制 / E1 墨盒或清洁盒开封后还能无理由退吗？"
+        },
+        {
+          "chunk_id": 370,
+          "score": 0.049075301736593246,
+          "section_path": "eufyMake / UV Printer E1 / X 轴皮带排查 / E1 怎样调整 X 轴同步带张力？"
+        }
+      ]
+    },
+    {
+      "case_id": "eufy-03",
+      "query": "美国的 S1 Pro 保修多少个月？",
+      "expected": "12 个月",
+      "passed": true,
+      "matched_chunk_id": 363,
+      "top5": [
+        {
+          "chunk_id": 363,
+          "score": 0.9962155222892761,
+          "section_path": "eufy / 美国退换与保修政策 / RoboVac 保修 / eufy S1 Pro T2080 在美国保修多久？"
+        },
+        {
+          "chunk_id": 385,
+          "score": 0.9361526370048523,
+          "section_path": "soundcore / 美国退换与保修政策 / 耳机保修 / Space One Pro A3062 在美国保修多久？"
+        },
+        {
+          "chunk_id": 364,
+          "score": 0.8372916579246521,
+          "section_path": "eufy / 美国退换与保修政策 / 官方商城退货 / 美国 eufy 官网购买的 S1 Pro 多久可以退？"
+        },
+        {
+          "chunk_id": 386,
+          "score": 0.6365863084793091,
+          "section_path": "soundcore / 美国退换与保修政策 / 官方商城退货 / 美国 soundcore 官网购买的 Space One Pro 多久可以退？"
+        },
+        {
+          "chunk_id": 362,
+          "score": 0.3108927011489868,
+          "section_path": "eufy / 美国退换与保修政策"
+        }
+      ]
+    },
+    {
+      "case_id": "eufy-04",
+      "query": "美国 eufy 官网买的扫地机几天内能退？",
+      "expected": "购买后 30 天内申请退款",
+      "passed": true,
+      "matched_chunk_id": 364,
+      "top5": [
+        {
+          "chunk_id": 375,
+          "score": 0.9828342199325562,
+          "section_path": "eufyMake / 美国退换与保修政策 / 标准退货政策 / 美国 eufyMake 官网购买 E1 后多久可以退？"
+        },
+        {
+          "chunk_id": 364,
+          "score": 0.948610782623291,
+          "section_path": "eufy / 美国退换与保修政策 / 官方商城退货 / 美国 eufy 官网购买的 S1 Pro 多久可以退？"
+        },
+        {
+          "chunk_id": 376,
+          "score": 0.512671172618866,
+          "section_path": "eufyMake / 美国退换与保修政策 / 耗材限制 / E1 墨盒或清洁盒开封后还能无理由退吗？"
+        },
+        {
+          "chunk_id": 363,
+          "score": 0.33926576375961304,
+          "section_path": "eufy / 美国退换与保修政策 / RoboVac 保修 / eufy S1 Pro T2080 在美国保修多久？"
+        },
+        {
+          "chunk_id": 362,
+          "score": 0.31874075531959534,
+          "section_path": "eufy / 美国退换与保修政策"
+        }
+      ]
+    },
+    {
+      "case_id": "soundcore-01",
+      "query": "A3062 怎么恢复出厂设置？",
+      "expected": "电源键和音量加号键 5 秒",
+      "passed": true,
+      "matched_chunk_id": 381,
+      "top5": [
+        {
+          "chunk_id": 381,
+          "score": 0.9992502331733704,
+          "section_path": "soundcore / Space One Pro / A3062 / 恢复出厂设置 / Space One Pro A3062 怎样重置？"
+        },
+        {
+          "chunk_id": 382,
+          "score": 0.9852675199508667,
+          "section_path": "soundcore / Space One Pro / A3062 / 连接问题 / Space One Pro 经常断连或无法配对怎么办？"
+        },
+        {
+          "chunk_id": 383,
+          "score": 0.2506873607635498,
+          "section_path": "soundcore / Space One Pro / A3062 / 官方来源 / 这些 Space One Pro 信息来自哪里？"
+        },
+        {
+          "chunk_id": 380,
+          "score": 0.23127494752407074,
+          "section_path": "soundcore / Space One Pro / A3062 / 产品识别 / Space One Pro 的型号是什么？"
+        },
+        {
+          "chunk_id": 330,
+          "score": 0.12019889801740646,
+          "section_path": "Anker 五产品线官方知识包 / 产品清单"
+        }
+      ]
+    },
+    {
+      "case_id": "soundcore-02",
+      "query": "美国买 Space One Pro 保修多久？",
+      "expected": "18 个月",
+      "passed": true,
+      "matched_chunk_id": 385,
+      "top5": [
+        {
+          "chunk_id": 385,
+          "score": 0.9986662864685059,
+          "section_path": "soundcore / 美国退换与保修政策 / 耳机保修 / Space One Pro A3062 在美国保修多久？"
+        },
+        {
+          "chunk_id": 386,
+          "score": 0.9803444147109985,
+          "section_path": "soundcore / 美国退换与保修政策 / 官方商城退货 / 美国 soundcore 官网购买的 Space One Pro 多久可以退？"
+        },
+        {
+          "chunk_id": 363,
+          "score": 0.8358254432678223,
+          "section_path": "eufy / 美国退换与保修政策 / RoboVac 保修 / eufy S1 Pro T2080 在美国保修多久？"
+        },
+        {
+          "chunk_id": 364,
+          "score": 0.744152307510376,
+          "section_path": "eufy / 美国退换与保修政策 / 官方商城退货 / 美国 eufy 官网购买的 S1 Pro 多久可以退？"
+        },
+        {
+          "chunk_id": 384,
+          "score": 0.6565493941307068,
+          "section_path": "soundcore / 美国退换与保修政策"
+        }
+      ]
+    },
+    {
+      "case_id": "soundcore-03",
+      "query": "美国 soundcore 官网耳机退货窗口是多少天？",
+      "expected": "购买后 30 天内申请退款",
+      "passed": true,
+      "matched_chunk_id": 386,
+      "top5": [
+        {
+          "chunk_id": 386,
+          "score": 0.991141676902771,
+          "section_path": "soundcore / 美国退换与保修政策 / 官方商城退货 / 美国 soundcore 官网购买的 Space One Pro 多久可以退？"
+        },
+        {
+          "chunk_id": 385,
+          "score": 0.8335073590278625,
+          "section_path": "soundcore / 美国退换与保修政策 / 耳机保修 / Space One Pro A3062 在美国保修多久？"
+        },
+        {
+          "chunk_id": 384,
+          "score": 0.5029281377792358,
+          "section_path": "soundcore / 美国退换与保修政策"
+        },
+        {
+          "chunk_id": 387,
+          "score": 0.29947370290756226,
+          "section_path": "soundcore / 美国退换与保修政策 / 地区与渠道限制 / 在第三方平台购买 Space One Pro 怎么退货？"
+        },
+        {
+          "chunk_id": 390,
+          "score": 0.26457884907722473,
+          "section_path": "Anker 五产品线 / 美国销售渠道与购买凭证 / 官方销售渠道 / 从哪里购买才能使用对应品牌的官方商城退货政策？"
+        }
+      ]
+    },
+    {
+      "case_id": "eufymake-01",
+      "query": "E1 打印错位可能是哪里松了？",
+      "expected": "X 轴同步带松动",
+      "passed": true,
+      "matched_chunk_id": 369,
+      "top5": [
+        {
+          "chunk_id": 369,
+          "score": 0.9521929025650024,
+          "section_path": "eufyMake / UV Printer E1 / X 轴皮带排查 / E1 打印图案错位或断色，怎样检查 X 轴同步带？"
+        },
+        {
+          "chunk_id": 359,
+          "score": 0.26848793029785156,
+          "section_path": "eufy / Robot Vacuum Omni S1 Pro / T2080 / 滚刷错误 / S1 Pro 报 E01 滚刷错误怎么办？"
+        },
+        {
+          "chunk_id": 370,
+          "score": 0.20491719245910645,
+          "section_path": "eufyMake / UV Printer E1 / X 轴皮带排查 / E1 怎样调整 X 轴同步带张力？"
+        }
+      ]
+    },
+    {
+      "case_id": "eufymake-02",
+      "query": "E1 的打印头保修多久？",
+      "expected": "打印头保修 3 个月",
+      "passed": true,
+      "matched_chunk_id": 374,
+      "top5": [
+        {
+          "chunk_id": 374,
+          "score": 0.9994168281555176,
+          "section_path": "eufyMake / 美国退换与保修政策 / 主机与打印头保修 / eufyMake UV Printer E1 主机和打印头分别保修多久？"
+        },
+        {
+          "chunk_id": 376,
+          "score": 0.6993240118026733,
+          "section_path": "eufyMake / 美国退换与保修政策 / 耗材限制 / E1 墨盒或清洁盒开封后还能无理由退吗？"
+        },
+        {
+          "chunk_id": 375,
+          "score": 0.6052444577217102,
+          "section_path": "eufyMake / 美国退换与保修政策 / 标准退货政策 / 美国 eufyMake 官网购买 E1 后多久可以退？"
+        },
+        {
+          "chunk_id": 373,
+          "score": 0.3830515742301941,
+          "section_path": "eufyMake / 美国退换与保修政策"
+        },
+        {
+          "chunk_id": 368,
+          "score": 0.35064271092414856,
+          "section_path": "eufyMake / UV Printer E1 / 产品识别 / eufyMake E1 是什么产品？"
+        }
+      ]
+    },
+    {
+      "case_id": "eufymake-03",
+      "query": "美国 E1 用过之后退货会收多少服务费？",
+      "expected": "已开封且使用过为 20%",
+      "passed": true,
+      "matched_chunk_id": 375,
+      "top5": [
+        {
+          "chunk_id": 375,
+          "score": 0.9868878722190857,
+          "section_path": "eufyMake / 美国退换与保修政策 / 标准退货政策 / 美国 eufyMake 官网购买 E1 后多久可以退？"
+        },
+        {
+          "chunk_id": 376,
+          "score": 0.145154669880867,
+          "section_path": "eufyMake / 美国退换与保修政策 / 耗材限制 / E1 墨盒或清洁盒开封后还能无理由退吗？"
+        },
+        {
+          "chunk_id": 374,
+          "score": 0.1321602761745453,
+          "section_path": "eufyMake / 美国退换与保修政策 / 主机与打印头保修 / eufyMake UV Printer E1 主机和打印头分别保修多久？"
+        }
+      ]
+    },
+    {
+      "case_id": "policy-01",
+      "query": "在经销商买的安克产品要找谁退款？",
+      "expected": "由销售方按其退货政策办理退款",
+      "passed": true,
+      "matched_chunk_id": 391,
+      "top5": [
+        {
+          "chunk_id": 391,
+          "score": 0.996802568435669,
+          "section_path": "Anker 五产品线 / 美国销售渠道与购买凭证 / 授权经销渠道 / 授权经销商买的产品由谁办理退货？"
+        },
+        {
+          "chunk_id": 341,
+          "score": 0.9866721630096436,
+          "section_path": "Anker Charging / 美国退换与保修政策 / 第三方渠道 / 在 Amazon 或经销商购买的 Anker 产品去哪里退货？"
+        },
+        {
+          "chunk_id": 390,
+          "score": 0.540866494178772,
+          "section_path": "Anker 五产品线 / 美国销售渠道与购买凭证 / 官方销售渠道 / 从哪里购买才能使用对应品牌的官方商城退货政策？"
+        },
+        {
+          "chunk_id": 354,
+          "score": 0.4687258303165436,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 地区与渠道限制 / C1000 可以全球联保吗？"
+        },
+        {
+          "chunk_id": 340,
+          "score": 0.3674056828022003,
+          "section_path": "Anker Charging / 美国退换与保修政策 / 官方商城退货 / 在美国 Anker 官网购买后多久可以退货？"
+        }
+      ]
+    },
+    {
+      "case_id": "policy-02",
+      "query": "中国大陆买的 C1000 可以直接按美国 30 天政策退货吗？",
+      "expected": "不能直接套用美国政策",
+      "passed": true,
+      "matched_chunk_id": 393,
+      "top5": [
+        {
+          "chunk_id": 352,
+          "score": 0.989245593547821,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 退货政策 / 在美国 SOLIX 官网买的 C1000 多久可以退？"
+        },
+        {
+          "chunk_id": 393,
+          "score": 0.9736290574073792,
+          "section_path": "Anker 五产品线 / 美国销售渠道与购买凭证 / 地区边界 / 中国大陆或其他地区的订单可以直接套用美国退换政策吗？"
+        },
+        {
+          "chunk_id": 353,
+          "score": 0.7577510476112366,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 退回电源站 / 退回 C1000 前要注意什么？"
+        },
+        {
+          "chunk_id": 355,
+          "score": 0.6974309086799622,
+          "section_path": "Anker SOLIX / 美国退换与保修政策 / 官方来源 / SOLIX C1000 美国政策来源是什么？"
+        },
+        {
+          "chunk_id": 350,
+          "score": 0.6237562298774719,
+          "section_path": "Anker SOLIX / 美国退换与保修政策"
+        }
+      ]
+    },
+    {
+      "case_id": "scope-01",
+      "query": "Nebula X1 投影仪保修多久？",
+      "expected": null,
+      "passed": true,
+      "matched_chunk_id": null,
+      "top5": []
+    }
+  ]
+}

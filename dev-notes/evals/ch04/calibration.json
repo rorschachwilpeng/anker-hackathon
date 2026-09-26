@@ -1,0 +1,44 @@
+{
+  "collection": "knowledge_hybrid_v1",
+  "model": "BAAI/bge-reranker-v2-m3",
+  "dataset": "/Users/qingyili/Documents/ChatGPT/AI客服/ecommerce-support/evals/ch04/calibration.jsonl",
+  "recommended_threshold": 0.036652312614023685,
+  "observations": [
+    {
+      "id": "A90",
+      "top_chunk_id": 124,
+      "score": 0.05401735380291939,
+      "relevant": true
+    },
+    {
+      "id": "B90",
+      "top_chunk_id": 330,
+      "score": 0.0002012223849305883,
+      "relevant": false
+    },
+    {
+      "id": "C90",
+      "top_chunk_id": 120,
+      "score": 0.2379922717809677,
+      "relevant": true
+    },
+    {
+      "id": "E90",
+      "top_chunk_id": 126,
+      "score": 0.5221449732780457,
+      "relevant": true
+    },
+    {
+      "id": "D90",
+      "top_chunk_id": 129,
+      "score": 0.019287271425127983,
+      "relevant": false
+    },
+    {
+      "id": "F90",
+      "top_chunk_id": 390,
+      "score": 0.004308158066123724,
+      "relevant": false
+    }
+  ]
+}
