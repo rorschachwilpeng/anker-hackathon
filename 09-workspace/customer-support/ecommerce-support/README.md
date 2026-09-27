@@ -1,13 +1,20 @@
-# 电商智能客服 · 第 3 章
+# 知遇 · Anker 智能服务 Agent
 
 FastAPI + SQLAlchemy + Docker MySQL/Milvus + LangChain。`query_faq` 已从 SQL LIKE 升级为硅基流动 BGE-M3 dense 向量检索；MySQL 保存权威原文，Milvus 保存向量。聊天页仍由模型自主选择一次业务工具，显示工具徽章并流式生成最终回答。
 
 ## 启动
 
-需要 Python 3.12+ 和已启动的 Docker Desktop。当前项目已配置并启动，可直接打开 http://127.0.0.1:8000/ 。全新安装：
+需要 Python 3.12+ 和已启动的 Docker Desktop。当前正式项目目录已配置服务，可直接打开 http://127.0.0.1:8000/ 。在本机从正式目录重新启动时，可复用已安装依赖的解释器，但必须用正式目录作 cwd 并显式指定 `--app-dir .`：
 
 ```bash
-cd "/Users/qingyili/Documents/ChatGPT/AI客服/ecommerce-support"
+cd "/Users/pengyoutian/Desktop/彭祐天的Github/Wiki_of_Tian/projects/anker-hackathon/09-workspace/customer-support/ecommerce-support"
+/Users/pengyoutian/.codex/worktrees/9a8c/anker-ghost-in-the-shell-hackathon/09-workspace/customer-support/ecommerce-support/.venv/bin/python -m uvicorn app.main:app --app-dir . --host 127.0.0.1 --port 8000
+```
+
+全新安装：
+
+```bash
+cd "/Users/pengyoutian/Desktop/彭祐天的Github/Wiki_of_Tian/projects/anker-hackathon/09-workspace/customer-support/ecommerce-support"
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
 test -e .env || cp .env.example .env
@@ -20,22 +27,22 @@ docker compose up -d mysql etcd minio milvus
 .venv/bin/python scripts/init_db.py
 .venv/bin/python scripts/init_knowledge.py
 .venv/bin/python scripts/knowledge.py import-dir knowledge/demo
-.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv/bin/python -m uvicorn app.main:app --app-dir . --host 127.0.0.1 --port 8000
 ```
 
 MySQL 8.4 仅暴露 `127.0.0.1:3307`，使用项目命名卷。初始化从 `sql/ch02-schema.sql` 与 `sql/ch04-orders-schema.sql` 创建缺失表，检查既有结构并幂等灌入演示数据，不删除已有数据。结构不兼容会拒绝初始化。启动应用前先初始化数据库。不要通过 `docker compose down -v` 清理持久数据。
 
 ## 浏览器演示
 
-打开 http://127.0.0.1:8000/ ，分别点击“新对话”后输入：
+打开 http://127.0.0.1:8000/ 。首页三张卡片与侧栏的“订单与物流、产品咨询与排障、售后跟进”对应；示例问题只填入输入框，不自动发送。分别点击“新对话”后，可从以下路径开始：
 
-1. **订单 DEMO-1001 的物流到哪了**：显示固定演示订单卡片；点击“查看订单详情”查看同一记录与完整物流时间线。其他订单号明确返回未找到，不生成替代数据。
-2. **退货政策是什么**：显示“查询常见问题”，从知识库召回七天退货政策及例外。
-3. **邮费是多少**：显示“查询常见问题”，语义召回“订单实付满99元包邮，未满99元收取8元运费”及偏远/大件例外。
+1. **订单与物流**：先说“我买的 S1 Pro 还没收到，帮我查一下。”，按追问输入 `DEMO-1001`；订单卡片与详情读取同一固定演示记录。继续询问预计送达或首次使用时，通用客服沿用该订单会话，不猜测空缺的预计日期。
+2. **产品咨询与排障**：从“我的 S1 Pro 最近吸力变弱了，怎么办？”开始；单图排障使用本模块的 `/s1pro/chat` 链路，产品确认、知识来源与建单前同意由服务端处理。
+3. **售后跟进**：对已创建或手动输入的已知演示工单号，读取 `/s1pro/tickets/{ticket_no}` 并刷新当前状态。没有工单、未找到或读取失败都有明确提示；不会凭点击入口自动建单。
 
 也可以问“商品 P1001 的价格和库存”，或明确要求创建咨询工单。商品价格和库存仍为随机 mock；订单 DEMO-1001 与物流是固定演示记录；工单会实际写入本地 tickets 表。
 
-本页自动保留当前 conversation_id。新对话、刷新和切换功能会开始新的页面会话，已存数据库记录保留；本章没有历史列表。停止生成不撤销已提交的工单。不同 HTTP 请求不自动去重，避免对已经成功的工单重复提问。
+本页自动保留当前 conversation_id。切换模块或返回首页只改变视图；只有“新对话”明确解除当前页面的会话绑定，刷新页面也会失去当前页面记录，但数据库旧记录保留。通用 `/chat` 与单图 `/s1pro/chat` 的任务状态不能直接跨链路迁移：当前服务链路固定到该次会话，需改用另一条链路时先新建对话，不会仅因点了模块而偷偷重置。图片草稿留在产品咨询输入上下文，不会发往普通客服。停止生成不撤销已提交的工单。不同 HTTP 请求不自动去重，避免对已经成功的工单重复提问。
 
 ## curl 与多轮上下文
 

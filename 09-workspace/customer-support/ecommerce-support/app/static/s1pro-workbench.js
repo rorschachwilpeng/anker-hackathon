@@ -25,7 +25,7 @@ async function showTicket(number) {
     const button = document.createElement('button');
     button.textContent = next;
     button.disabled = ticket.status === next;
-    button.style.cssText = 'margin:0 8px 0 0;padding:4px 12px';
+    button.className = 'workbench-action';
     button.onclick = async () => {
       button.disabled = true;
       const update = await fetch(`/s1pro/tickets/${encodeURIComponent(ticket.ticket_no)}/status`, {
@@ -49,7 +49,7 @@ async function loadTickets() {
     for (const ticket of tickets) {
       const button = document.createElement('button');
       button.textContent = `${ticket.ticket_no} · ${ticket.symptom || '问题待确认'} · ${ticket.status}`;
-      button.style.cssText = 'display:block;margin:10px 0;padding:10px';
+      button.className = 'workbench-ticket';
       button.onclick = () => showTicket(ticket.ticket_no);
       list.append(button);
     }

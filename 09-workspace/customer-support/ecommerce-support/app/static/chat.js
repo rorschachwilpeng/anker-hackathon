@@ -1,30 +1,37 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
-let mode = 'chat';
+let mode = null;
+let currentView = 'home';
 let conversationId = null;
+let ticketNo = null;
+let ticketRequest = 0;
 let active = null;
 let selectedImage = null;
 let previewUrl = null;
 let dragDepth = 0;
 const previewUrls = new Set();
-const titles = {chat: '客服对话', extract: '售后提取', s1pro: 'S1 Pro 售后演示'};
+const titles = {home: '', chat: '客服对话', order: '订单与物流', product: '产品咨询与排障', ticket: '售后跟进'};
 const types = {refund:'退款',return_refund:'退货退款',exchange:'换货',repair:'维修',logistics:'物流问题',other:'其他',unknown:'未说明'};
 function scrollDown() { $('scroll-area').scrollTop = $('scroll-area').scrollHeight; }
+function canUpload() { return currentView==='product' && (mode===null || mode==='s1pro'); }
+function canContinue() { return currentView!=='ticket' && (!selectedImage || currentView==='product') && (mode!=='s1pro' || currentView==='product'); }
 function syncInput() {
-  const hasImage = mode === 's1pro' && Boolean(selectedImage);
-  $('send').disabled = Boolean(active) || (!$('message').value.trim() && !hasImage);
-  $('add-image').disabled = Boolean(active) || hasImage;
-  $('choose-image').disabled = Boolean(active) || hasImage;
+  const hasImage = canUpload() && Boolean(selectedImage);
+  $('send').disabled = Boolean(active) || !canContinue() || (!$('message').value.trim() && !hasImage);
+  $('add-image').disabled = Boolean(active) || hasImage || !canUpload();
+  $('choose-image').disabled = Boolean(active) || hasImage || !canUpload();
   $('remove-image').disabled = Boolean(active);
-  $('image-file').disabled = Boolean(active) || mode !== 's1pro';
+  $('image-file').disabled = Boolean(active) || !canUpload();
 }
 function busy(value) {
   $('send').hidden = value; $('stop').hidden = !value;
-  for (const id of ['new-chat','chat-mode','extract-mode','s1pro-mode']) $(id).disabled = value;
+  for (const id of ['new-chat','brand-home','home-link']) $(id).disabled = value;
+  for (const button of document.querySelectorAll('[data-view]')) button.disabled=value;
   $('message').disabled = value; syncInput();
 }
 function addMessage(role, text, image = null) {
   $('welcome').hidden = true;
+  $('messages').hidden = false;
   const article = document.createElement('article'); article.className = `message ${role}`;
   const label = document.createElement('div'); label.className = 'speaker'; label.textContent = role === 'user' ? '你' : '知遇 · AI 助手';
   const bubble = document.createElement('div'); bubble.className = 'bubble';
@@ -79,25 +86,50 @@ function renderKnowledgeSources(data,view) {
   }
   if(section.childElementCount) {view.article.append(section);scrollDown();}
 }
-function reset(next=mode) {
+function navigate(next) {
+  if(active) return;
+  if(next!=='ticket') ticketRequest++;
+  currentView=next;
+  $('page-title').textContent=titles[next];
+  $('breadcrumb').hidden=next==='home';
+  for(const name of ['home','order','product']) $(name+'-welcome').hidden=name!==next;
+  $('welcome').hidden=next==='ticket'||next==='chat'||(next!=='home'&&$('messages').childElementCount>0);
+  $('messages').hidden=next==='home'||next==='ticket'||!$('messages').childElementCount;
+  $('ticket-panel').hidden=next!=='ticket';
+  $('composer-area').hidden=next==='ticket';
+  $('s1pro-status').hidden=next!=='product'||!$('s1pro-status').textContent;
+  for(const name of ['order','product','ticket']) {
+    const button=$(name+'-mode'); button.classList.toggle('selected',name===next);
+    if(name===next) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');
+  }
+  closeImageMenu();
+  $('image-tools').hidden=!canUpload();
+  $('attachment').hidden=!canUpload()||!selectedImage;
+  $('message').placeholder=next==='product'?'描述产品和使用问题…':'说说你遇到的问题…';
+  $('input-hint').textContent=selectedImage&&next!=='product'
+    ?'图片草稿保留在产品咨询；请返回处理后再发送'
+    :mode==='s1pro'&&next!=='product'
+    ?'当前排障会话请回到产品咨询继续；换链路需新对话'
+    :mode==='chat'&&next==='product'
+      ?'当前会话继续通用咨询；图片排障需新对话'
+      :next==='product'?'可添加一张图片 · 建单前需确认':'Enter 发送 · Shift + Enter 换行';
+  syncInput();
+  if(next==='ticket') loadTicket();
+  else $('scroll-area').scrollTop=0;
+}
+function reset() {
   if(active) return;
   for (const url of previewUrls) URL.revokeObjectURL(url);
   previewUrls.clear(); selectedImage=null; previewUrl=null; $('image-file').value='';
   $('attachment').hidden=true; $('thumbnail').removeAttribute('src'); $('image-feedback').hidden=true;
   $('image-feedback').textContent=''; $('composer').classList.remove('dragging');
   $('drop-mask').hidden=true; dragDepth=0; closeImageMenu();
-  mode=next; conversationId=null; $('messages').replaceChildren(); $('welcome').hidden=false; $('message').value='';
+  mode=null; conversationId=null; ticketNo=null; ticketRequest++; $('ticket-number').value='';
+  $('ticket-detail').replaceChildren(); $('ticket-detail').hidden=true; $('ticket-refresh').hidden=true;
+  $('messages').replaceChildren(); $('message').value='';
   $('s1pro-status').hidden=true; $('s1pro-status').textContent='';
-  $('image-tools').hidden=mode!=='s1pro';
   $('announcement').textContent='已开始新对话';
-  $('page-title').textContent=titles[mode];
-  for(const kind of ['chat','extract','s1pro']) {const button=$(kind+'-mode'); button.classList.toggle('selected',kind===mode); if(kind===mode) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');}
-  $('welcome-title').innerText=mode==='chat'?'每一个问题，\n都值得认真回应。':mode==='s1pro'?'S1 Pro 问题，\n一步一步解决。':'把一段描述，\n整理成清楚的诉求。';
-  $('welcome-description').textContent=mode==='chat'?'退换货、物流、售后咨询，告诉我你遇到了什么。':mode==='s1pro'?'本地演示：先确认产品，再依据 eufy 官方资料排查；建单前需要你明确同意。':'贴入售后描述，提取订单号、诉求类型和期望方案。';
-  $('suggestions').hidden=mode!=='chat';
-  $('message').placeholder=mode==='chat'?'说说你的问题，我来帮你一起解决…':mode==='s1pro'?'例如：我的 S1 Pro 吸力变弱了':'例如：订单 A123 的衣服太小了，我想换大一码。';
-  $('input-hint').textContent=mode==='chat'?'Enter 发送 · Shift + Enter 换行':mode==='s1pro'?'仅本地演示 · 建单需明确同意':'只提取已提供的信息，不执行售后操作';
-  syncInput(); $('message').focus();
+  navigate('home'); $('message').focus();
 }
 async function streamChat(response,view) {
   if(!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) throw new Error('没有收到有效的流式回复，请重试。');
@@ -131,20 +163,60 @@ async function streamChat(response,view) {
     return {answer,reason};
   } finally { await reader.cancel().catch(()=>{}); reader.releaseLock(); }
 }
-function showExtraction(data,view) {
+function showExtraction(data) {
   if(!data || Object.keys(data).sort().join(',')!=='expected_solution,order_id,request_type' || !Object.hasOwn(types,data.request_type) || ![data.order_id,data.expected_solution].every(v=>v===null||typeof v==='string')) throw new Error('提取结果格式异常，请重试。');
-  view.bubble.classList.remove('pending');
-  view.bubble.textContent='已整理这段售后描述';
+  const result=$('extract-result'); result.replaceChildren();
   const list=document.createElement('dl'); list.className='result-fields';
   for(const [label,value] of [['订单号',data.order_id],['诉求类型',types[data.request_type]],['期望方案',data.expected_solution]]) {
     const dt=document.createElement('dt');dt.textContent=label;const dd=document.createElement('dd');dd.textContent=value??'未提供';list.append(dt,dd);
   }
-  const details=document.createElement('details'); const summary=document.createElement('summary');summary.textContent='查看 JSON';const pre=document.createElement('pre');pre.textContent=JSON.stringify(data,null,2);details.append(summary,pre);view.article.append(list,details);scrollDown();
+  result.append(list);
+}
+function ticketField(list,label,value) {
+  const dt=document.createElement('dt'); dt.textContent=label;
+  const dd=document.createElement('dd'); dd.textContent=Array.isArray(value)?value.join('；'):(value??'待补充');
+  list.append(dt,dd);
+}
+function renderTicket(ticket) {
+  if(typeof ticket?.ticket_no!=='string'||typeof ticket.status!=='string') throw new Error('工单数据格式异常。');
+  const detail=$('ticket-detail'); detail.replaceChildren();
+  const title=document.createElement('h2'); title.textContent='工单 '+ticket.ticket_no;
+  const badge=document.createElement('span'); badge.className='demo-label'; badge.textContent='本地演示';
+  const heading=document.createElement('div'); heading.className='ticket-heading'; heading.append(title,badge);
+  const list=document.createElement('dl');
+  for(const [label,value] of [['当前状态',ticket.status],['型号',ticket.product_model],['问题',ticket.symptom],['已建议步骤',ticket.suggested_steps],['已尝试步骤',ticket.completed_steps],['用户反馈',ticket.feedback],['交接摘要',ticket.description]]) ticketField(list,label,value);
+  detail.append(heading,list);
+  for(const source of ticket.sources||[]) {
+    if(typeof source?.title!=='string'||typeof source.url!=='string') continue;
+    let url; try {url=new URL(source.url);} catch {continue;}
+    if(url.protocol!=='https:'||!['service.eufy.com','www.eufy.com','salesforce-knowledge-download.s3.us-west-2.amazonaws.com'].includes(url.hostname)) continue;
+    const link=document.createElement('a'); link.href=url.href; link.target='_blank'; link.rel='noopener noreferrer'; link.textContent='资料来源：'+source.title; detail.append(link);
+  }
+  detail.hidden=false;
+}
+async function loadTicket() {
+  const request=++ticketRequest;
+  const detail=$('ticket-detail'); detail.replaceChildren(); detail.hidden=true;
+  $('ticket-refresh').hidden=!ticketNo;
+  if(!ticketNo) { $('ticket-status').textContent='当前会话还没有工单。可输入已知演示工单号，或返回产品咨询与排障。'; return; }
+  $('ticket-number').value=ticketNo;
+  $('ticket-status').textContent='正在读取工单…';
+  try {
+    const response=await fetch('/s1pro/tickets/'+encodeURIComponent(ticketNo),{cache:'no-store'});
+    if(request!==ticketRequest) return;
+    if(response.status===404) { $('ticket-status').textContent='未找到该工单，请核对工单号。'; return; }
+    if(!response.ok) throw new Error('读取失败，请点击“刷新进度”重试。');
+    renderTicket(await response.json());
+    if(request!==ticketRequest) {detail.replaceChildren();detail.hidden=true;return;}
+    $('ticket-status').textContent='已读取服务端当前记录。';
+  } catch {
+    if(request===ticketRequest) {detail.replaceChildren();detail.hidden=true;$('ticket-status').textContent='工单读取失败，旧状态已隐藏。请点击“刷新进度”重试。';}
+  }
 }
 const s1proStages={clarify_product:'确认产品中',ask_symptom:'了解故障现象',ask_feedback:'等待您的反馈',confirm_ticket:'等待建单确认',ticket_created:'工单已创建',ticket_failed:'建单未成功',resolved:'问题已解决',no_answer:'暂无对应官方资料',degraded:'服务暂时降级'};
 function updateS1ProStatus(progress,stage) {
   const bar=$('s1pro-status');
-  if (mode!=='s1pro'||!progress) { bar.hidden=true; return; }
+  if (currentView!=='product'||!progress) { bar.hidden=true; return; }
   const parts=[progress.product?`已确认：${progress.product}`:'产品：待确认'];
   if (progress.symptom) parts.push(`症状：${progress.symptom}`);
   parts.push(`已建议 ${progress.suggested} 步 · 已尝试 ${progress.tried} 步`);
@@ -205,9 +277,10 @@ function showS1Pro(data,view) {
     const link=document.createElement('a'); link.href=data.source.url; link.textContent=`资料来源：${data.source.title}`;
     link.target='_blank'; link.rel='noopener noreferrer'; view.article.append(link);
   }
-  if (typeof data.ticket_url==='string' && data.ticket_url.startsWith('/s1pro/tickets/')) {
-    const link=document.createElement('a'); link.href=data.ticket_url; link.textContent='查看工单进度（本地演示）';
-    link.target='_blank'; link.rel='noopener noreferrer'; link.className='ticket-link'; view.article.append(link);
+  if (typeof data.ticket_no==='string' && data.ticket_url==='/s1pro/tickets/'+data.ticket_no) {
+    ticketNo=data.ticket_no;
+    const link=document.createElement('button'); link.type='button'; link.textContent='查看工单进度（本地演示）';
+    link.className='ticket-link'; link.onclick=()=>navigate('ticket'); view.article.append(link);
   }
   const stage=s1proStages[data.action]||'处理中';
   note(view,`当前阶段：${stage}`);
@@ -236,7 +309,7 @@ function clearImageDraft({revoke=true,clearFeedback=true}={}) {
 }
 function chooseImage(image) {
   $('image-file').value='';
-  if(!image||active||mode!=='s1pro') return;
+  if(!image||active||!canUpload()) return;
   setImageFeedback();
   if(selectedImage) { setImageFeedback('本轮只能添加一张图片，请先移除已选图片。'); return; }
   if(!['image/png','image/jpeg'].includes(image.type)) { setImageFeedback('仅支持 JPG 或 PNG 图片。'); return; }
@@ -244,17 +317,19 @@ function chooseImage(image) {
   showImageDraft(image,URL.createObjectURL(image));
 }
 async function submit(event) {
-  event.preventDefault(); if(active) return;
+  event.preventDefault(); if(active||!canContinue()) return;
   const message=$('message').value.trim();
-  const submittedMode=mode;
-  const submittedImage=submittedMode==='s1pro'?selectedImage:null;
+  const submittedMode=mode||(currentView==='product'?'s1pro':'chat');
+  const submittedImage=canUpload()?selectedImage:null;
   const submittedPreviewUrl=submittedImage?previewUrl:null;
   if(!message&&!submittedImage) return;
+  mode=submittedMode;
+  if(currentView==='home') navigate('chat');
   closeImageMenu();
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
-  $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在生成回复':'正在提取售后信息';
+  $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':'正在生成回复';
   addMessage('user',message,submittedImage?{url:submittedPreviewUrl}:null);
-  const view=addMessage('assistant',submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在思考…':submittedMode==='s1pro'?'正在理解您的描述…':'正在整理…');
+  const view=addMessage('assistant',submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在思考…':'正在理解您的描述…');
   view.bubble.classList.add('pending');
   if(submittedImage) clearImageDraft({revoke:false});
   let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},150000);
@@ -266,27 +341,26 @@ async function submit(event) {
       form.append('image',submittedImage);
       response=await fetch('/s1pro/chat/image',{method:'POST',body:form,signal:controller.signal});
     } else {
-      const payload=submittedMode==='chat'||submittedMode==='s1pro'?{message,conversation_id:conversationId}:{description:message};
-      response=await fetch(submittedMode==='chat'?'/chat':submittedMode==='s1pro'?'/s1pro/chat':'/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
+      const payload={message,conversation_id:conversationId};
+      response=await fetch(submittedMode==='chat'?'/chat':'/s1pro/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
     }
     if(!response.ok) {const data=await response.json().catch(()=>({}));throw new Error(typeof data.detail==='string'?data.detail:`请求未成功（${response.status}），请检查输入后重试。`);}
     if(submittedMode==='chat') {
       const {answer,reason}=await streamChat(response,view);
       if(reason==='length') note(view,'回复达到长度上限，内容可能不完整；本轮未加入对话记忆。');
 
-    } else if(submittedMode==='s1pro'&&!submittedImage) await streamS1Pro(response,view);
-    else if(submittedMode==='s1pro') showS1Pro(await response.json(),view);
-    else showExtraction(await response.json(),view);
+    } else if(!submittedImage) await streamS1Pro(response,view);
+    else showS1Pro(await response.json(),view);
     $('announcement').textContent='回复完成';
   } catch(error) {
     view.bubble.classList.remove('pending');
-    if(['正在思考…','正在整理…','正在识别图片并整理可见线索…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
+    if(['正在思考…','正在识别图片并整理可见线索…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
     const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
     for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
     note(view,text+' 已提交的工单不会因停止生成而撤销。',!controller.signal.aborted||timedOut);
     const retry=document.createElement('button');retry.type='button';retry.className='retry';retry.textContent='重新编辑';retry.onclick=()=>{
       if(active) return;
-      if(mode!==submittedMode) { note(view,'请切回本轮发送模式后再重新编辑。'); return; }
+      if(mode!==submittedMode||!canContinue()) { note(view,'请返回本轮服务模块后再重新编辑。'); return; }
       if(submittedImage&&selectedImage&&selectedImage!==submittedImage) { note(view,'请先移除输入区当前图片，再恢复本轮图片。',true); return; }
       $('message').value=message;
       if(submittedImage&&!selectedImage) showImageDraft(submittedImage,submittedPreviewUrl);
@@ -300,9 +374,28 @@ $('message').addEventListener('input',syncInput);
 $('message').addEventListener('keydown',(event)=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&event.keyCode!==229){event.preventDefault();$('composer').requestSubmit();}});
 $('stop').onclick=()=>active?.abort();
 $('new-chat').onclick=()=>reset();
-$('chat-mode').onclick=()=>{if(mode!=='chat')reset('chat');};
-$('extract-mode').onclick=()=>{if(mode!=='extract')reset('extract');};
-$('s1pro-mode').onclick=()=>{if(mode!=='s1pro')reset('s1pro');};
+$('brand-home').onclick=()=>navigate('home');
+$('home-link').onclick=()=>navigate('home');
+for(const button of document.querySelectorAll('[data-view]')) button.onclick=()=>navigate(button.dataset.view);
+$('ticket-to-product').onclick=()=>navigate('product');
+$('ticket-lookup').addEventListener('submit',(event)=>{
+  event.preventDefault(); const value=$('ticket-number').value.trim();
+  if(!value) {$('ticket-status').textContent='请输入工单号。';return;}
+  ticketNo=value; loadTicket();
+});
+$('ticket-refresh').onclick=()=>loadTicket();
+$('about-open').onclick=()=>{$('about-mask').hidden=false;$('about-close').focus();};
+$('about-close').onclick=()=>{$('about-mask').hidden=true;$('about-open').focus();};
+$('about-mask').onclick=(event)=>{if(event.target===$('about-mask')) $('about-mask').hidden=true;};
+$('extract-form').addEventListener('submit',async(event)=>{
+  event.preventDefault();const description=$('extract-input').value.trim();if(!description)return;
+  $('extract-result').textContent='正在整理…';
+  try {
+    const response=await fetch('/after-sales/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description})});
+    if(!response.ok) throw new Error();
+    showExtraction(await response.json());
+  } catch {$('extract-result').textContent='提取失败，请检查服务后重试。';}
+});
 $('add-image').addEventListener('click',()=>{
   if(active||selectedImage) return;
   $('add-menu').hidden=!$('add-menu').hidden;
@@ -312,20 +405,20 @@ $('choose-image').addEventListener('click',()=>{closeImageMenu();$('image-file')
 $('image-file').addEventListener('change',()=>chooseImage($('image-file').files[0]));
 $('remove-image').addEventListener('click',()=>clearImageDraft());
 document.addEventListener('click',(event)=>{if(!event.target.closest('#image-tools')) closeImageMenu();});
-document.addEventListener('keydown',(event)=>{if(event.key==='Escape') closeImageMenu();});
+document.addEventListener('keydown',(event)=>{if(event.key==='Escape') {closeImageMenu();$('about-mask').hidden=true;}});
 $('composer').addEventListener('dragenter',(event)=>{
   if(!event.dataTransfer?.types.includes('Files')) return;
   event.preventDefault();
-  if(active||mode!=='s1pro') return;
+  if(active||!canUpload()) return;
   dragDepth++; $('composer').classList.add('dragging'); $('drop-mask').hidden=false;
 });
 $('composer').addEventListener('dragover',(event)=>{
   if(!event.dataTransfer?.types.includes('Files')) return;
   event.preventDefault();
-  if(!active&&mode==='s1pro') event.dataTransfer.dropEffect='copy';
+  if(!active&&canUpload()) event.dataTransfer.dropEffect='copy';
 });
 $('composer').addEventListener('dragleave',(event)=>{
-  if(!event.dataTransfer?.types.includes('Files')||active||mode!=='s1pro') return;
+  if(!event.dataTransfer?.types.includes('Files')||active||!canUpload()) return;
   event.preventDefault();
   dragDepth=Math.max(0,dragDepth-1);
   if(dragDepth===0) { $('composer').classList.remove('dragging'); $('drop-mask').hidden=true; }
@@ -333,12 +426,13 @@ $('composer').addEventListener('dragleave',(event)=>{
 $('composer').addEventListener('drop',(event)=>{
   if(!event.dataTransfer?.files.length) return;
   event.preventDefault(); dragDepth=0; $('composer').classList.remove('dragging'); $('drop-mask').hidden=true;
-  if(active||mode!=='s1pro') return;
+  if(active||!canUpload()) return;
   if(event.dataTransfer.files.length!==1) { setImageFeedback('本轮只能添加一张图片。'); return; }
   chooseImage(event.dataTransfer.files[0]);
 });
 for(const button of document.querySelectorAll('[data-prompt]')) button.onclick=()=>{$('message').value=button.dataset.prompt;syncInput();$('message').focus();};
 fetch('/health').then(r=>{if(!r.ok)throw new Error();$('connection').textContent='服务已连接';$('connection').classList.add('online');}).catch(()=>{$('connection').textContent='服务未连接';});
+navigate('home');
 
 function updateToolBadge(view,data) {
   const names={query_order:'查询订单',query_product:'查询商品',query_logistics:'查询物流',query_faq:'查询常见问题',create_ticket:'创建人工工单'};

@@ -8,64 +8,52 @@
 <body>
 <div class="workspace">
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="知遇首页"><span class="brand-symbol">知</span><span>知遇 <small>智能客服</small></span></a>
-    <button class="new-chat" id="new-chat"><span aria-hidden="true">＋</span> 新对话</button>
-    <div class="nav-label">工作空间</div>
-    <nav aria-label="功能导航">
-      <button class="nav-item selected" id="chat-mode" aria-current="page"><span aria-hidden="true">◌</span> 客服对话 <span class="nav-arrow" aria-hidden="true">↗</span></button>
-      <button class="nav-item" id="extract-mode"><span aria-hidden="true">▤</span> 售后提取</button>
-      <button class="nav-item" id="s1pro-mode"><span aria-hidden="true">✳</span> S1 Pro 售后演示</button>
-      <a class="nav-item" href="/s1pro/workbench"><span aria-hidden="true">▤</span> 本地客服工单</a>
+    <button class="brand" id="brand-home" type="button" aria-label="知遇首页"><span class="brand-symbol">知</span><span><span class="brand-name">知遇</span><small>智能客服</small></span></button>
+    <button class="new-chat" id="new-chat" type="button"><span aria-hidden="true">＋</span> 新对话</button>
+    <div class="nav-label">为你服务</div>
+    <nav aria-label="服务模块">
+      <button class="nav-item" id="order-mode" data-view="order" type="button"><span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 5V3m6 2V3m-7 11h4"/></svg></span>订单与物流</button>
+      <button class="nav-item" id="product-mode" data-view="product" type="button"><span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 8v9l9 5 9-5V8M12 13v9"/></svg></span>产品咨询与排障</button>
+      <button class="nav-item" id="ticket-mode" data-view="ticket" type="button"><span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v5a4 4 0 0 1-4 4h-3"/><rect x="2" y="11" width="4" height="7" rx="2"/><rect x="18" y="11" width="4" height="7" rx="2"/></svg></span>售后跟进</button>
     </nav>
-    <div class="sidebar-note"><span class="note-label">让沟通更简单</span><p>从一个问题开始，<br>一起找到解决办法。</p></div>
-    <div class="sidebar-foot"><span class="avatar">我</span><span>本地工作空间<small>对话仅保留在当前页面</small></span></div>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-bottom">
+      <a class="nav-item" href="/s1pro/workbench" target="_blank" rel="noopener noreferrer"><span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11m4-7h4m-4 3h4"/></svg></span>客服工作台 <span class="external" aria-hidden="true">↗</span></a>
+      <button class="about-link" id="about-open" type="button">关于演示</button>
+    </div>
   </aside>
   <main>
-    <header><div><span id="page-title">客服对话</span><span class="header-tag">AI 助手</span></div><span class="status" id="connection" role="status">正在连接</span></header>
+    <header><div class="breadcrumbs"><button class="home-link" id="home-link" type="button">首页</button><span id="breadcrumb" hidden aria-hidden="true">/</span><span id="page-title"></span></div><span class="status" id="connection" role="status">正在连接</span></header>
     <div class="s1pro-status" id="s1pro-status" role="status" hidden></div>
-    <section class="scroll-area" id="scroll-area" aria-label="对话内容">
+    <section class="scroll-area" id="scroll-area" aria-label="服务内容">
       <div class="welcome" id="welcome">
-        <div class="eyebrow">YOUR EVERYDAY SUPPORT</div>
-        <div class="welcome-mark" aria-hidden="true">✳</div>
-        <h1 id="welcome-title">每一个问题，<br>都值得认真回应。</h1>
-        <p id="welcome-description">退换货、物流、售后咨询，告诉我你遇到了什么。</p>
-        <div class="suggestions" id="suggestions">
-          <button data-prompt="收到的衣服尺码小了，我想换大一码，需要提供哪些信息？"><span>退换货咨询</span><small>尺码不合适，该怎么办？</small><b aria-hidden="true">↗</b></button>
-          <button data-prompt="我的包裹物流三天没有更新了，我可以怎么处理？"><span>物流问题</span><small>包裹迟迟没到，想了解进度</small><b aria-hidden="true">↗</b></button>
-          <button data-prompt="商品收到后发现有破损，我应该准备哪些售后材料？"><span>售后帮助</span><small>商品有问题，了解处理方式</small><b aria-hidden="true">↗</b></button>
-        </div>
+        <section id="home-welcome"><h1><span class="grad">你好</span></h1><p>有什么可以帮你？</p>
+          <div class="suggestions">
+            <button data-view="order" type="button"><span class="card-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 5V3m6 2V3m-7 11h4"/></svg></span><span class="card-title">订单与物流</span><span class="card-desc">查看订单信息和配送进度。</span><span class="card-arrow" aria-hidden="true">↗</span></button>
+            <button data-view="product" type="button"><span class="card-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 8v9l9 5 9-5V8M12 13v9"/></svg></span><span class="card-title">产品咨询与排障</span><span class="card-desc">了解产品用法，解决使用问题。</span><span class="card-arrow" aria-hidden="true">↗</span></button>
+            <button data-view="ticket" type="button"><span class="card-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v5a4 4 0 0 1-4 4h-3"/><rect x="2" y="11" width="4" height="7" rx="2"/><rect x="18" y="11" width="4" height="7" rx="2"/></svg></span><span class="card-title">售后跟进</span><span class="card-desc">查看工单进度与处理记录。</span><span class="card-arrow" aria-hidden="true">↗</span></button>
+          </div><p class="home-caption">也可以直接在下方输入问题，从当前服务会话开始。</p>
+        </section>
+        <section id="order-welcome" hidden><span class="module-symbol">◎</span><h1>订单与物流</h1><p>查询演示订单信息与配送进度，后续问题可在同一会话继续。</p><div class="examples"><button type="button" data-prompt="我买的 S1 Pro 还没收到，帮我查一下。">我买的 S1 Pro 还没收到，帮我查一下。</button></div><p class="scope">演示订单需由你提供订单号；不会预先绑定订单或猜测送达日期。</p></section>
+        <section id="product-welcome" hidden><span class="module-symbol">✳</span><h1>产品咨询与排障</h1><p>先确认产品，再依据可核查资料逐步处理；图片只作为可见线索。</p><div class="examples"><button type="button" data-prompt="我的 S1 Pro 最近吸力变弱了，怎么办？">我的 S1 Pro 最近吸力变弱了，怎么办？</button><button type="button" data-prompt="我的 S1 Pro 扫地机器人吸力变弱了。">我的 S1 Pro 扫地机器人吸力变弱了。</button></div><p class="scope">进入模块不代表已确认型号；转人工建单前会请求你的同意。</p></section>
       </div>
-      <div class="messages" id="messages" role="log" aria-label="聊天消息" aria-live="polite" aria-relevant="additions"></div>
+      <div class="messages" id="messages" role="log" aria-label="聊天消息" aria-live="polite" aria-relevant="additions" hidden></div>
+      <section class="ticket-panel" id="ticket-panel" aria-labelledby="ticket-heading" hidden>
+        <span class="module-symbol">◌</span><h1 id="ticket-heading">售后跟进</h1><p class="ticket-intro">读取本地演示工单的实际状态与交接记录。人工回复和对话内自然语言查工单尚未接通。</p>
+        <form id="ticket-lookup" class="ticket-lookup"><label for="ticket-number">工单号</label><div><input id="ticket-number" maxlength="32" autocomplete="off" placeholder="输入已知工单号"><button type="submit">查看工单</button><button id="ticket-refresh" type="button" hidden>刷新进度</button></div></form>
+        <p class="ticket-status" id="ticket-status" role="status">当前会话还没有工单。可输入已知演示工单号，或返回产品咨询与排障。</p>
+        <div id="ticket-detail" class="ticket-detail" hidden></div><button class="text-action" id="ticket-to-product" type="button">返回产品咨询与排障 →</button>
+      </section>
     </section>
-    <div class="composer-area">
-      <form id="composer" class="composer">
-        <div class="drop-mask" id="drop-mask" hidden><div>松开以添加图片<small>仅支持一张 JPG 或 PNG，最大 5 MB</small></div></div>
-        <div class="attachment" id="attachment" hidden>
-          <img id="thumbnail" alt="待发送图片预览">
-          <div class="attachment-info"><strong id="file-name"></strong><small>未发送 · 仅本轮使用</small></div>
-          <button class="remove" id="remove-image" type="button" aria-label="移除图片">×</button>
-        </div>
-        <div class="feedback" id="image-feedback" role="alert" hidden></div>
-        <label class="sr-only" for="message">输入消息</label>
-        <textarea id="message" rows="2" maxlength="16000" placeholder="说说你的问题，我来帮你一起解决…"></textarea>
-        <div class="composer-bottom">
-          <div class="add-wrap" id="image-tools" hidden>
-            <button class="add-button" id="add-image" type="button" aria-label="添加图片" aria-expanded="false" aria-controls="add-menu">＋</button>
-            <div class="add-menu" id="add-menu" hidden>
-              <div class="add-menu-title">添加</div>
-              <button class="upload-option" id="choose-image" type="button"><span class="folder-icon" aria-hidden="true"></span>上传图片</button>
-            </div>
-          </div>
-          <span id="input-hint">Enter 发送 · Shift + Enter 换行</span>
-          <button id="send" type="submit" disabled aria-label="发送消息">发送 <span aria-hidden="true">↑</span></button>
-          <button id="stop" type="button" hidden>停止生成 <span aria-hidden="true">■</span></button>
-        </div>
-        <input id="image-file" class="sr-only" type="file" accept="image/png,image/jpeg" aria-label="选择图片">
-      </form>
-      <div class="footnote">AI 回复仅供参考，实际售后处理请以商家确认为准。</div>
-      <div class="sr-only" id="announcement" role="status"></div>
-    </div>
+    <div class="composer-area" id="composer-area"><form id="composer" class="composer">
+      <div class="drop-mask" id="drop-mask" hidden><div>松开以添加图片<small>仅支持一张 JPG 或 PNG，最大 5 MB</small></div></div>
+      <div class="attachment" id="attachment" hidden><img id="thumbnail" alt="待发送图片预览"><div class="attachment-info"><strong id="file-name"></strong><small>未发送 · 仅本轮使用</small></div><button class="remove" id="remove-image" type="button" aria-label="移除图片">×</button></div>
+      <div class="feedback" id="image-feedback" role="alert" hidden></div><label class="sr-only" for="message">输入消息</label><textarea id="message" rows="2" maxlength="16000" placeholder="说说你遇到的问题…"></textarea>
+      <div class="composer-bottom"><div class="add-wrap" id="image-tools" hidden><button class="add-button" id="add-image" type="button" aria-label="添加图片" aria-expanded="false" aria-controls="add-menu">＋</button><div class="add-menu" id="add-menu" hidden><div class="add-menu-title">添加</div><button class="upload-option" id="choose-image" type="button"><span class="folder-icon" aria-hidden="true"></span>上传图片</button></div></div><span id="input-hint">Enter 发送 · Shift + Enter 换行</span><button id="send" type="submit" disabled aria-label="发送消息">发送 <span aria-hidden="true">↑</span></button><button id="stop" type="button" hidden>停止生成 <span aria-hidden="true">■</span></button></div>
+      <input id="image-file" class="sr-only" type="file" accept="image/png,image/jpeg" aria-label="选择图片">
+    </form><div class="footnote">AI 回复仅供参考；订单、工单均为本地演示数据，不代表安克真实服务。</div><div class="sr-only" id="announcement" role="status"></div></div>
   </main>
 </div>
+<div class="about-mask" id="about-mask" hidden><section class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-title"><button class="about-close" id="about-close" type="button" aria-label="关闭说明">×</button><h2 id="about-title">关于演示</h2><p>知遇把咨询、订单查询和产品排障放在同一个服务入口。回答来自实际运行的本地客服服务，不是预录回放。</p><p>固定订单和工单写入本地演示库；产品知识展示可核查的来源。没有连接安克真实订单、物流或人工客服系统。跨对话链路的任务状态迁移、人工回复与处理结果反馈仍未实现。</p><details><summary>内部工具：售后信息提取</summary><form id="extract-form" class="extract-form"><label for="extract-input">售后描述</label><textarea id="extract-input" maxlength="16000" placeholder="粘贴售后描述，仅整理已提供的信息"></textarea><button type="submit">提取信息</button></form><div id="extract-result" role="status"></div></details></section></div>
 </body>
 </html>
