@@ -219,7 +219,7 @@ async function loadTicket() {
     if(request===ticketRequest) {detail.replaceChildren();detail.hidden=true;$('ticket-status').textContent='工单读取失败，旧状态已隐藏。请点击“刷新进度”重试。';}
   }
 }
-const s1proStages={clarify_product:'确认产品中',ask_symptom:'了解故障现象',ask_feedback:'等待您的反馈',confirm_ticket:'等待建单确认',ticket_created:'工单已创建',ticket_failed:'建单未成功',resolved:'问题已解决',no_answer:'暂无对应官方资料',degraded:'服务暂时降级'};
+const s1proStages={clarify_product:'确认产品中',ask_symptom:'了解故障现象',ask_feedback:'等待您的反馈',confirm_ticket:'等待建单确认',ticket_created:'工单已创建',ticket_failed:'建单未成功',ticket_deferred:'暂不建单',resolved:'问题已解决',no_answer:'暂无对应官方资料',degraded:'服务暂时降级'};
 function updateS1ProStatus(progress,stage) {
   const bar=$('s1pro-status');
   if (currentView!=='product'||!progress) { bar.hidden=true; return; }
@@ -263,20 +263,25 @@ async function streamS1Pro(response,view) {
   if(!result) throw new Error('回复没有完整到达，请重试。');
   showS1Pro(result,view);
 }
-const s1proQuickReplies={product:['是的，就是这款','不是这款产品'],symptom:['吸力变弱'],feedback:['好了，吸力恢复了','还是不行'],ticket_confirmation:['可以建单','再想想，先不建']};
-function renderS1ProQuickReplies(view,awaiting) {
-  const options=s1proQuickReplies[awaiting];
+const productQuickReplies={candidate:['确认是 T2080 扫地机器人','不是这款产品'],category:['是扫地机器人','是吸乳器']};
+const s1proQuickReplies={symptom:['吸力变弱'],feedback:['好了，吸力恢复了','还是不行'],ticket_confirmation:['可以建单','再想想，先不建']};
+function disableQuickReplies() {
+  for(const button of document.querySelectorAll('.quick-reply')) button.disabled=true;
+}
+function renderS1ProQuickReplies(view,awaiting,productOptions) {
+  const options=awaiting==='product'?productQuickReplies[productOptions]:s1proQuickReplies[awaiting];
   if(!options) return;
   const row=document.createElement('div'); row.className='quick-replies';
   for(const text of options) {
     const button=document.createElement('button'); button.type='button'; button.className='quick-reply'; button.textContent=text;
-    button.onclick=()=>{ if(active) return; $('message').value=text; syncInput(); $('composer').requestSubmit(); };
+    button.onclick=()=>{ if(active||button.disabled) return; $('message').value=text; syncInput(); $('composer').requestSubmit(); };
     row.append(button);
   }
   view.article.append(row); scrollDown();
 }
 function showS1Pro(data,view) {
   if (!Number.isSafeInteger(data.conversation_id) || typeof data.reply !== 'string') throw new Error('服务回复格式异常。');
+  disableQuickReplies();
   conversationId=data.conversation_id; view.bubble.classList.remove('pending'); view.bubble.textContent=data.reply;
   if (typeof data.notice==='string' && data.notice) note(view,data.notice);
   if (data.source?.url && data.source?.title) {
@@ -291,7 +296,7 @@ function showS1Pro(data,view) {
   const stage=s1proStages[data.action]||'处理中';
   note(view,`当前阶段：${stage}`);
   updateS1ProStatus(data.progress,stage);
-  renderS1ProQuickReplies(view,data.progress?.awaiting);
+  renderS1ProQuickReplies(view,data.progress?.awaiting,data.progress?.product_options);
 }
 function closeImageMenu() {
   $('add-menu').hidden=true;
@@ -330,6 +335,7 @@ async function submit(event) {
   const submittedImage=canUpload()?selectedImage:null;
   const submittedPreviewUrl=submittedImage?previewUrl:null;
   if(!message&&!submittedImage) return;
+  disableQuickReplies();
   mode=submittedMode;
   if(currentView==='home') navigate(destination);
   closeImageMenu();

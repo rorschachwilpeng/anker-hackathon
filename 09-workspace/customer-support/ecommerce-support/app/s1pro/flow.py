@@ -27,6 +27,10 @@ def _affirm_product(message):
     return message.strip('。！!，, ').casefold() in ('是的', '对', '对的', '是', '确认', '没错', 'yes')
 
 
+def _decline_product(message):
+    return message.strip('。！!，, ')=='不是这款产品'
+
+
 def _confirms_t2080_vacuum(message):
     lowered=message.casefold()
     return ('t2080' in lowered and '扫地机器人' in message
@@ -89,7 +93,7 @@ class S1ProFlow:
         image_failure_notice=copy.IMAGE_FAILURE_NOTICE if image_failed else ''
         urgent_notice=''
 
-        async def respond(action,reply,source=None,ticket_no=None,ticket_url=None):
+        async def respond(action,reply,source=None,ticket_no=None,ticket_url=None,product_options=None):
             if urgent_notice:
                 reply=f'{urgent_notice}{reply}'
             await self.repo.save_s1pro_state(conversation_id,state)
@@ -100,6 +104,7 @@ class S1ProFlow:
                       'tried':len(state.completed_steps),
                       'sources':[item['title'] for item in state.sources],
                       'awaiting':state.awaiting,
+                      'product_options':product_options,
                       'urgent':state.urgent,
                       'ticket_no':state.ticket_no}
             return {'conversation_id':conversation_id,'action':action,'reply':reply,
@@ -172,9 +177,26 @@ class S1ProFlow:
                                  ticket_no=state.ticket_no,ticket_url=f'/s1pro/tickets/{state.ticket_no}')
 
         if state.awaiting=='ticket_confirmation':
+            if message.strip('。！!，, ')=='再想想，先不建':
+                state.awaiting=None
+                return await respond('ticket_deferred',copy.TICKET_DEFERRED)
             if not _explicit_consent(message):
                 return await respond('confirm_ticket',copy.pick(copy.CONFIRM_TICKET_ASKS,conversation_id))
             return await create_ticket()
+
+        if state.awaiting=='product' and _decline_product(message):
+            state.confirmed_model=None
+            state.pending_model_candidate=None
+            state.visual_observation=None
+            return await respond('clarify_product',copy.CLARIFY_PRODUCT_GENERIC)
+
+        if state.awaiting=='product' and state.pending_model_candidate is None and state.visual_observation is None:
+            if message.strip('。！!，, ')=='是扫地机器人':
+                state.pending_model_candidate='T2080'
+                return await respond('clarify_product',copy.pick(copy.CLARIFY_PRODUCT_T2080S,conversation_id),
+                                     product_options='candidate')
+            if message.strip('。！!，, ')=='是吸乳器':
+                return await respond('clarify_product',copy.CLARIFY_PRODUCT_NOT_VACUUM)
 
         affirmative_confirmation=(
             state.awaiting=='product'
@@ -189,7 +211,7 @@ class S1ProFlow:
             try:
                 understood=await self.understanding.interpret(message,state)
             except Exception:
-                if any(term in message for term in ('吸力变弱','吸力恢复','还是没用','转人工')):
+                if any(term in message for term in ('吸力变弱','吸力恢复','还是没用','还是不行','转人工')):
                     understood={}
                 else:
                     return await respond('degraded',copy.DEGRADED_UNDERSTANDING)
@@ -251,7 +273,7 @@ class S1ProFlow:
                 and _mentions_s1_pro(message) and '扫地机器人' not in message and 't2080' not in message.casefold()):
             state.pending_model_candidate=None
             state.awaiting='product'
-            return await respond('clarify_product',copy.CLARIFY_PRODUCT_AMBIGUOUS)
+            return await respond('clarify_product',copy.CLARIFY_PRODUCT_AMBIGUOUS,product_options='category')
 
         if observation is not None and observation.candidate_model=='T2080' and state.confirmed_model is None:
             state.pending_model_candidate='T2080'
@@ -266,13 +288,20 @@ class S1ProFlow:
                         state.pending_model_candidate='T2080'
                 state.awaiting='product'
                 if state.pending_model_candidate=='T2080':
-                    reply=(copy.CLARIFY_PRODUCT_AMBIGUOUS if _mentions_s1_pro(message) and '扫地机器人' not in message
-                           else copy.pick(copy.CLARIFY_PRODUCT_T2080S,conversation_id))
+                    if _mentions_s1_pro(message) and '扫地机器人' not in message and observation is None:
+                        state.pending_model_candidate=None
+                        reply=copy.CLARIFY_PRODUCT_AMBIGUOUS
+                        product_options='category'
+                    else:
+                        reply=copy.pick(copy.CLARIFY_PRODUCT_T2080S,conversation_id)
+                        product_options='candidate'
                 elif state.visual_observation and state.visual_observation.get('candidate_model')=='unknown':
                     reply=copy.CLARIFY_PRODUCT_IMAGE_UNKNOWN
+                    product_options=None
                 else:
                     reply=copy.CLARIFY_PRODUCT_GENERIC
-                return await respond('clarify_product',reply)
+                    product_options=None
+                return await respond('clarify_product',reply,product_options=product_options)
             state.confirmed_model='T2080'
             state.pending_model_candidate=None
             state.awaiting=None

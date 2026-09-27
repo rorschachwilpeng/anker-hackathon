@@ -97,6 +97,7 @@ def ticket_terminal(number):
             '也不代表人工已接手。')
 
 TICKET_FAILED = '工单刚才没建成，可能是哪里抖了一下。您的进展我都记着呢，咱们再试一次？'
+TICKET_DEFERRED = '好，先不建单。您的处理记录还在，需要人工协助时再告诉我。'
 
 # --- 降级与边界 ---
 DEGRADED_UNDERSTANDING = '抱歉，这句我没太听明白——您是在说产品型号，还是告诉我试过之后的效果？'
