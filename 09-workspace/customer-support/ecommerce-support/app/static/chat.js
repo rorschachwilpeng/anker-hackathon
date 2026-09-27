@@ -21,6 +21,16 @@ function homeDestination(message) {
   if (/订单|物流|还没收到|没收到|配送/.test(normalized)) return 'order';
   return 'chat';
 }
+async function waitForReplyTarget(targetAt,signal) {
+  if(signal.aborted) throw new DOMException('已停止','AbortError');
+  const remaining=targetAt-performance.now();
+  if(remaining<=0) return;
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{signal.removeEventListener('abort',onAbort);resolve();},remaining);
+    function onAbort() {clearTimeout(timer);signal.removeEventListener('abort',onAbort);reject(new DOMException('已停止','AbortError'));}
+    signal.addEventListener('abort',onAbort,{once:true});
+  });
+}
 function syncInput() {
   const hasImage = canUpload() && Boolean(selectedImage);
   $('send').disabled = Boolean(active) || !canContinue() || (!$('message').value.trim() && !hasImage);
@@ -140,6 +150,7 @@ function reset() {
 async function streamChat(response,view) {
   if(!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) throw new Error('没有收到有效的流式回复，请重试。');
   const reader=response.body.getReader(); const decoder=new TextDecoder(); let buffer='', answer='', finished=false, reason='';
+  const results=[];
   try {
     while(!finished) {
       const {value,done}=await reader.read(); buffer += done?decoder.decode():decoder.decode(value,{stream:true});
@@ -150,23 +161,25 @@ async function streamChat(response,view) {
         const raw=lines.filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
         if(!raw) continue;
         const data=JSON.parse(raw);
-        if(event==='answer_reset') {answer='';view.bubble.textContent='正在查询…';}
+        if(event==='answer_reset') answer='';
         if(event==='session') { if(!Number.isSafeInteger(data.conversation_id)||data.conversation_id<1) throw new Error('会话标识无效'); conversationId=data.conversation_id; }
         if(event==='tool_status') updateToolBadge(view,data);
-        if(event==='order_card') renderOrderCard(data,view);
-        if(event==='knowledge_sources') renderKnowledgeSources(data,view);
+        if(event==='order_card') {
+          if(!data?.found||data.source!=='demo'||!data.order||!Array.isArray(data.items)) throw new Error('订单卡片数据格式异常，请重试。');
+          results.push({event,data});
+        }
+        if(event==='knowledge_sources') results.push({event,data});
         if(event==='error') throw new Error(data.message || '回复中断，请重试。');
         if(event==='token') {
           if(typeof data.text!=='string') throw new Error('回复格式异常，请重试。');
-          view.bubble.classList.remove('pending');
-          answer+=data.text; view.bubble.textContent=answer; scrollDown();
+          answer+=data.text;
         }
         if(event==='done') {reason=data.finish_reason; if(!['stop','length'].includes(reason)) throw new Error('回复未正常结束，请重试。'); finished=true; break;}
       }
       if(done) break;
     }
     if(!finished || !answer.trim()) throw new Error('回复没有完整到达，请重试。');
-    return {answer,reason};
+    return {answer,reason,results};
   } finally { await reader.cancel().catch(()=>{}); reader.releaseLock(); }
 }
 function showExtraction(data) {
@@ -234,9 +247,10 @@ function updateS1ProStatus(progress,stage) {
 }
 async function streamS1Pro(response,view) {
   if(!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
-    showS1Pro(await response.json(),view); return;
+    return {result:await response.json(),sourceEvents:[]};
   }
-  const reader=response.body.getReader(); const decoder=new TextDecoder(); let buffer='', result=null, failure=null;
+  const reader=response.body.getReader(); const decoder=new TextDecoder(); let buffer='', result=null;
+  const sourceEvents=[];
   const stageText={understanding:'正在理解您的描述…',searching:'正在检索 eufy 官方排障资料…'};
   try {
     for(;;) {
@@ -249,19 +263,15 @@ async function streamS1Pro(response,view) {
         if(!raw) continue;
         const data=JSON.parse(raw);
         if(event==='stage') { view.bubble.textContent=stageText[data.stage]||'正在处理…'; scrollDown(); }
-        if(event==='search_done' && typeof data.title==='string') {
-          const badge=document.createElement('span'); badge.className='tool-badge'; badge.dataset.status='succeeded';
-          badge.textContent=`检索到官方资料：${data.title}`; view.tools.append(badge); scrollDown();
-        }
-        if(event==='error') failure=data;
+        if(event==='search_done' && typeof data.title==='string') sourceEvents.push(data);
+        if(event==='error') throw new Error(typeof data.message==='string'?data.message:'服务暂时不可用，请重试。');
         if(event==='result') result=data;
       }
       if(done) break;
     }
   } finally { await reader.cancel().catch(()=>{}); reader.releaseLock(); }
-  if(failure) throw new Error(typeof failure.message==='string'?failure.message:'服务暂时不可用，请重试。');
   if(!result) throw new Error('回复没有完整到达，请重试。');
-  showS1Pro(result,view);
+  return {result,sourceEvents};
 }
 const productQuickReplies={candidate:['确认是 T2080 扫地机器人','不是这款产品'],category:['是扫地机器人','是吸乳器']};
 const s1proQuickReplies={symptom:['吸力变弱'],feedback:['好了，吸力恢复了','还是不行'],ticket_confirmation:['可以建单','再想想，先不建']};
@@ -335,6 +345,7 @@ async function submit(event) {
   const submittedImage=canUpload()?selectedImage:null;
   const submittedPreviewUrl=submittedImage?previewUrl:null;
   if(!message&&!submittedImage) return;
+  const replyTarget=performance.now()+2000+Math.random()*3000;
   disableQuickReplies();
   mode=submittedMode;
   if(currentView==='home') navigate(destination);
@@ -342,7 +353,7 @@ async function submit(event) {
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
   $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':'正在生成回复';
   addMessage('user',message,submittedImage?{url:submittedPreviewUrl}:null);
-  const view=addMessage('assistant',submittedImage?'正在识别图片并整理可见线索…':submittedMode==='chat'?'正在思考…':'正在理解您的描述…');
+  const view=addMessage('assistant','正在整理回复…');
   view.bubble.classList.add('pending');
   if(submittedImage) clearImageDraft({revoke:false});
   let timedOut=false; const timer=setTimeout(()=>{timedOut=true;controller.abort();},150000);
@@ -359,16 +370,32 @@ async function submit(event) {
     }
     if(!response.ok) {const data=await response.json().catch(()=>({}));throw new Error(typeof data.detail==='string'?data.detail:`请求未成功（${response.status}），请检查输入后重试。`);}
     if(submittedMode==='chat') {
-      const {answer,reason}=await streamChat(response,view);
+      const {answer,reason,results}=await streamChat(response,view);
+      await waitForReplyTarget(replyTarget,controller.signal);
+      view.bubble.classList.remove('pending'); view.bubble.textContent=answer; scrollDown();
+      for(const item of results) {
+        if(item.event==='order_card') renderOrderCard(item.data,view);
+        else renderKnowledgeSources(item.data,view);
+      }
       if(reason==='length') note(view,'回复达到长度上限，内容可能不完整；本轮未加入对话记忆。');
-
-    } else if(!submittedImage) await streamS1Pro(response,view);
-    else showS1Pro(await response.json(),view);
+    } else {
+      const {result,sourceEvents}=submittedImage
+        ?{result:await response.json(),sourceEvents:[]}
+        :await streamS1Pro(response,view);
+      if(!Number.isSafeInteger(result?.conversation_id)||typeof result.reply!=='string') throw new Error('服务回复格式异常。');
+      view.bubble.textContent='正在整理回复…';
+      await waitForReplyTarget(replyTarget,controller.signal);
+      for(const data of sourceEvents) {
+        const badge=document.createElement('span'); badge.className='tool-badge'; badge.dataset.status='succeeded';
+        badge.textContent=`检索到官方资料：${data.title}`; view.tools.append(badge);
+      }
+      showS1Pro(result,view);
+    }
     $('announcement').textContent='回复完成';
   } catch(error) {
     view.bubble.classList.remove('pending');
-    if(['正在思考…','正在识别图片并整理可见线索…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
-    const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
+    if(['正在整理回复…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
+    const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止显示本轮回复。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
     for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
     const ticketAttempt=submittedMode==='s1pro' && /可以建单|同意建单|确认创建工单|请创建工单/.test(message);
     note(view,text+(ticketAttempt?' 建单结果尚未确认，请先核对工单再重试。':''),!controller.signal.aborted||timedOut);
