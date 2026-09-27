@@ -26,7 +26,7 @@ async def stateful_chat(service,request):
             raise
         except Exception as exc:
             log.warning('chat failed conversation=%s kind=%s code=%s',turn.conversation_id,type(exc).__name__,exc.code if isinstance(exc,ChatProtocolError) else 'unclassified')
-            yield 'event: error\ndata: {"code":"chat_error","message":"本轮回复未完成，请稍后重试；已提交的工单不会撤销。"}\n\n'
+            yield 'event: error\ndata: {"code":"chat_error","message":"本轮回复未完成，请稍后重试。"}\n\n'
         finally:
             await upstream.aclose()
             turn.close()

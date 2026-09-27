@@ -364,7 +364,8 @@ async function submit(event) {
     if(['正在思考…','正在识别图片并整理可见线索…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
     const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
     for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
-    note(view,text+' 已提交的工单不会因停止生成而撤销。',!controller.signal.aborted||timedOut);
+    const ticketAttempt=submittedMode==='s1pro' && /可以建单|同意建单|确认创建工单|请创建工单/.test(message);
+    note(view,text+(ticketAttempt?' 建单结果尚未确认，请先核对工单再重试。':''),!controller.signal.aborted||timedOut);
     const retry=document.createElement('button');retry.type='button';retry.className='retry';retry.textContent='重新编辑';retry.onclick=()=>{
       if(active) return;
       if(mode!==submittedMode||!canContinue()) { note(view,'请返回本轮服务模块后再重新编辑。'); return; }

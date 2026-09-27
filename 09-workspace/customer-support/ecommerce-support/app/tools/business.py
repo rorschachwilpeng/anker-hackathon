@@ -73,7 +73,11 @@ def build_tools(repo,context: ToolContext,knowledge_search=None):
                 current=await repo.get_current_order_product_model(context.conversation_id)
                 if not current['found']:
                     return {'keyword':keyword,'found':False,'items':[],'reason':current['reason']}
-                rows=await knowledge_search.find_for_model(keyword,current['model_code'])
+                compact=''.join(keyword.split())
+                if current['model_code']=='T2080' and any(term in compact for term in ('第一次怎么用','首次使用','第一次使用')):
+                    rows=await knowledge_search.find_first_use_for_model(keyword,current['model_code'])
+                else:
+                    rows=await knowledge_search.find_for_model(keyword,current['model_code'])
             else:
                 rows=await knowledge_search.find(keyword)
             return pack_faq_result(keyword,rows)

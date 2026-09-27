@@ -18,6 +18,37 @@ class ChatProtocolError(RuntimeError):
 class ChatError(Exception):
     def __init__(self,status,message):self.status=status;self.message=message
 
+def _first_use_items(data):
+    return [item for item in data.get('items',[]) if item.get('product_model')=='T2080'
+            and ('quick start' in item.get('source_title','').casefold()
+                 or '首次使用' in item.get('source_title',''))]
+
+def _fixed_demo_answer(name,result):
+    if not result.get('ok'):
+        return '这次查询没有成功，我暂时不能确认结果。请稍后再试。'
+    data=result['data']
+    if name=='query_order':
+        if not data.get('found'):
+            return f'没有找到订单 {data.get("order_no", "")}，请核对订单号。'
+        order=data['order']
+        products='、'.join(f'{item["product_name"]}（{item["model_code"]}）' for item in data['items']) or '暂无商品明细'
+        latest=data.get('latest_event')
+        progress=(f'{latest["occurred_at"]} 在{latest["location"]}，{latest["description"]}'
+                  if latest else '暂无物流记录')
+        return (f'查到了，订单 {order["order_no"]} 的商品是{products}。'
+                f'支付状态：{order["payment_status"]}；配送状态：{order["shipping_status"]}。'
+                f'最新物流：{progress}。详情可以点下方订单卡片查看。')
+    if not data.get('found'):
+        if data.get('reason')=='no_current_order':
+            return '请先告诉我订单号，我再按订单里的具体型号查首次使用方法。'
+        if data.get('reason')=='ambiguous_order_products':
+            return '这笔订单有多个商品，请告诉我您想了解哪一款的首次使用方法。'
+        return '我暂时没查到这台商品的首次使用资料，不想凭印象给您操作步骤。'
+    items=_first_use_items(data)
+    if not items:
+        return '我查到了当前订单的商品，但这次没有命中对应的首次使用指南，暂时不能给您可靠步骤。'
+    return f'查到了这台 T2080 的首次使用指南。{items[0]["answer"].strip()}\n来源见下方。'
+
 @dataclass
 class PreparedTurn:
     conversation_id: int
@@ -66,15 +97,15 @@ class ChatService:
             order_match=re.search(r'(?<![A-Za-z0-9])DEMO\s*-\s*[0-9]+(?![0-9])',turn.message,re.IGNORECASE)
             direct=None
             if not order_match and s1_pro and any(term in turn.message for term in ('还没收到','没收到','帮我查')):
-                direct='可以，我帮您查这笔演示订单。请告诉我订单号。'
+                direct='可以，我帮您查。请告诉我订单号。'
             elif '明天' in turn.message and any(term in turn.message for term in ('收到','送到','到货')):
                 current=await self.repo.get_current_order_detail(cid)
                 if current is None:
-                    direct='请先告诉我订单号，我才能查看这笔演示订单的配送信息。'
+                    direct='请先告诉我订单号，我才能查看配送信息。'
                 else:
                     eta=current['order']['estimated_delivery_at']
-                    direct=(f'这笔演示订单记录的预计送达时间是 {eta}，但实际送达仍以物流更新为准。'
-                            if eta else '这笔演示订单目前没有预计送达时间，我无法确认明天能否收到。')
+                    direct=(f'这笔订单记录的预计送达时间是 {eta}，但实际送达仍以物流更新为准。'
+                            if eta else '这笔订单目前没有预计送达时间，我无法确认明天能否收到。')
             if direct is not None:
                 await self.repo.append_message(cid,'assistant',direct)
                 yield StreamEvent('token',{'text':direct})
@@ -138,18 +169,24 @@ class ChatService:
                     if (index==0 and call['name']=='query_faq'
                             and call['args'].get('scope')=='current_order_product'
                             and result.get('ok') and result['data'].get('found')):
-                        yield StreamEvent('knowledge_sources',{'items':result['data']['items']})
-                final_messages=trim_turns(self.system,turn.turns,current,self.settings.input_budget)
-                upstream=self.model.bind(tool_choice='none').astream(final_messages) # Explicitly forbid another tool call.
-                answer='';reason=None
-                try:
-                    async for chunk in upstream:
-                        if chunk.tool_call_chunks:raise ChatProtocolError('unexpected final tool call')
-                        if chunk.text:
-                            answer+=chunk.text
-                            yield StreamEvent('token',{'text':chunk.text})
-                        reason=chunk.response_metadata.get('finish_reason') or reason
-                finally:await upstream.aclose()
+                        items=_first_use_items(result['data']) if forced else result['data']['items']
+                        if items:yield StreamEvent('knowledge_sources',{'items':items})
+                if forced:
+                    answer=_fixed_demo_answer(forced['name'],result)
+                    reason='stop'
+                    yield StreamEvent('token',{'text':answer})
+                else:
+                    final_messages=trim_turns(self.system,turn.turns,current,self.settings.input_budget)
+                    upstream=self.model.bind(tool_choice='none').astream(final_messages) # Explicitly forbid another tool call.
+                    answer='';reason=None
+                    try:
+                        async for chunk in upstream:
+                            if chunk.tool_call_chunks:raise ChatProtocolError('unexpected final tool call')
+                            if chunk.text:
+                                answer+=chunk.text
+                                yield StreamEvent('token',{'text':chunk.text})
+                            reason=chunk.response_metadata.get('finish_reason') or reason
+                    finally:await upstream.aclose()
             if not answer.strip() or reason not in ('stop','length'):raise ChatProtocolError('unfinished response')
             if reason=='stop':await self.repo.append_message(cid,'assistant',answer)
             yield StreamEvent('done',{'finish_reason':reason})

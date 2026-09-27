@@ -62,6 +62,15 @@ class KnowledgeSearch:
                           "source_title": draft.source_title, "source_url": draft.source_url})
         return items
 
+    async def find_first_use_for_model(self,query: str,confirmed_model: str) -> list[dict]:
+        hits=await self.find_for_model(query,confirmed_model)
+        guide=next((item for item in hits if 'quick start' in item['source_title'].casefold()),None)
+        if guide is None:return []
+        chunks=await self.repo.load_done_source(guide['source_url'],confirmed_model)
+        steps=[row for row in chunks if any(line.lstrip().startswith('1.') for line in row.draft.answer.splitlines())]
+        return [{'id':row.id,'answer':row.draft.answer,'product_model':row.draft.product_model,
+                 'source_title':row.draft.source_title,'source_url':row.draft.source_url} for row in steps]
+
 
 def _outer_size(payload: dict) -> int:
     outer = {"ok": True, "data": payload, "error": None}
