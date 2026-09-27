@@ -208,11 +208,13 @@ def create_app(
         observation: VisualObservation | None = None
         vision = application.state.vision_client
         image_failed = vision is None
+        image_failure_reason = 'not_configured' if image_failed else None
         if vision is not None:
             try:
                 observation = await vision.analyze(image_bytes, mime_type)
-            except VisionError:
+            except VisionError as exc:
                 image_failed = True
+                image_failure_reason = exc.code
 
         try:
             return await flow.handle(
@@ -220,6 +222,7 @@ def create_app(
                 conversation_id,
                 observation=observation,
                 image_failed=image_failed,
+                image_failure_reason=image_failure_reason,
             )
         except LookupError:
             raise HTTPException(404, '会话不存在。') from None

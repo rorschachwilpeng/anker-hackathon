@@ -66,6 +66,7 @@ class S1ProFlow:
         *,
         observation: VisualObservation | None = None,
         image_failed: bool = False,
+        image_failure_reason: str | None = None,
         events=None,
     ):
         async def emit(payload):
@@ -90,7 +91,6 @@ class S1ProFlow:
                 'uncertainties':list(observation.uncertainties),
             }
         tool_calls=0
-        image_failure_notice=copy.IMAGE_FAILURE_NOTICE if image_failed else ''
         urgent_notice=''
 
         async def respond(action,reply,source=None,ticket_no=None,ticket_url=None,product_options=None):
@@ -110,7 +110,7 @@ class S1ProFlow:
             return {'conversation_id':conversation_id,'action':action,'reply':reply,
                     'source':source,'ticket_no':ticket_no,'tool_calls':tool_calls,
                     'progress':progress,'ticket_url':ticket_url,
-                    'notice':image_failure_notice or None}
+                    'notice':None}
 
         def capture_urgency(understood):
             nonlocal urgent_notice
@@ -175,6 +175,17 @@ class S1ProFlow:
         if state.ticket_no and state.awaiting is None:
             return await respond('ticket_created',copy.ticket_terminal(state.ticket_no),
                                  ticket_no=state.ticket_no,ticket_url=f'/s1pro/tickets/{state.ticket_no}')
+
+        if image_failed:
+            if state.confirmed_model is None:
+                state.visual_observation=None
+                state.pending_model_candidate=None
+                if state.symptom is None and any(term in message for term in ('吸力变弱','不吸')):
+                    state.symptom='吸力变弱'
+                state.awaiting='product'
+            reply=(copy.IMAGE_SERVICE_NOT_CONFIGURED if image_failure_reason=='not_configured'
+                   else copy.IMAGE_SERVICE_UNAVAILABLE)
+            return await respond('clarify_product' if state.confirmed_model is None else 'degraded',reply)
 
         if state.awaiting=='ticket_confirmation':
             if message.strip('。！!，, ')=='再想想，先不建':

@@ -15,7 +15,8 @@ def pick(pool, seed):
     return pool[seed % len(pool)]
 
 
-IMAGE_FAILURE_NOTICE = '这张照片我没太看清，不过不碍事——先按您说的来。'
+IMAGE_SERVICE_NOT_CONFIGURED = '图片识别服务尚未配置，我现在无法读取这张照片，也不能据此确认型号。请用文字告诉我产品完整型号；配置好服务后也可以重新上传。'
+IMAGE_SERVICE_UNAVAILABLE = '图片识别服务暂时不可用，我这次无法读取照片，也不能据此确认型号。请用文字告诉我产品完整型号，或稍后重试上传。'
 URGENT_NOTICE = '知道您着急，我尽量少让您走弯路。'
 
 # --- 确认产品 ---

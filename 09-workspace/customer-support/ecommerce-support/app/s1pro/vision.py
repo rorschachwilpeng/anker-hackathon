@@ -18,7 +18,9 @@ class VisualObservation(BaseModel):
 
 
 class VisionError(Exception):
-    pass
+    def __init__(self, message: str, code: str = "unavailable") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class VisionClient:
@@ -33,7 +35,7 @@ class VisionClient:
     async def analyze(self, image_bytes: bytes, mime_type: str) -> VisualObservation:
         key = self.settings.vision_api_key
         if not key or not key.get_secret_value().strip():
-            raise VisionError("vision service is not configured")
+            raise VisionError("vision service is not configured", "not_configured")
         if not image_bytes:
             raise VisionError("image is empty")
 
