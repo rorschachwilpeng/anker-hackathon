@@ -1,7 +1,6 @@
 'use strict';
 const list = document.getElementById('tickets');
 const detail = document.getElementById('detail');
-const STATUSES = ['待处理', '处理中', '已解决'];
 function field(label, value) {
   const row = document.createElement('p');
   row.textContent = `${label}：${Array.isArray(value) ? value.join('；') : (value || '待补充')}`;
@@ -19,26 +18,6 @@ async function showTicket(number) {
     const link = document.createElement('a'); link.textContent = source.title; link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
     row.append(link); detail.append(row);
   }
-  const actions = document.createElement('p');
-  actions.textContent = '更新状态（本地演示）：';
-  for (const next of STATUSES) {
-    const button = document.createElement('button');
-    button.textContent = next;
-    button.disabled = ticket.status === next;
-    button.className = 'workbench-action';
-    button.onclick = async () => {
-      button.disabled = true;
-      const update = await fetch(`/s1pro/tickets/${encodeURIComponent(ticket.ticket_no)}/status`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({status: next})
-      });
-      if (update.ok) { showTicket(ticket.ticket_no); loadTickets(); return; }
-      button.disabled = false;
-    };
-    actions.append(button);
-  }
-  detail.append(actions);
 }
 async function loadTickets() {
   try {

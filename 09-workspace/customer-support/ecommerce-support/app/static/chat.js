@@ -15,6 +15,12 @@ const types = {refund:'退款',return_refund:'退货退款',exchange:'换货',re
 function scrollDown() { $('scroll-area').scrollTop = $('scroll-area').scrollHeight; }
 function canUpload() { return currentView==='product' && (mode===null || mode==='s1pro'); }
 function canContinue() { return currentView!=='ticket' && (!selectedImage || currentView==='product') && (mode!=='s1pro' || currentView==='product'); }
+function homeDestination(message) {
+  const normalized=message.toLowerCase().replace(/\s+/g,'');
+  if (/s1[\s-]*pro/i.test(message) && /吸力|不吸/.test(message)) return 'product';
+  if (/订单|物流|还没收到|没收到|配送/.test(normalized)) return 'order';
+  return 'chat';
+}
 function syncInput() {
   const hasImage = canUpload() && Boolean(selectedImage);
   $('send').disabled = Boolean(active) || !canContinue() || (!$('message').value.trim() && !hasImage);
@@ -319,12 +325,13 @@ function chooseImage(image) {
 async function submit(event) {
   event.preventDefault(); if(active||!canContinue()) return;
   const message=$('message').value.trim();
-  const submittedMode=mode||(currentView==='product'?'s1pro':'chat');
+  const destination=mode?null:currentView==='home'?homeDestination(message):currentView;
+  const submittedMode=mode||(destination==='product'?'s1pro':'chat');
   const submittedImage=canUpload()?selectedImage:null;
   const submittedPreviewUrl=submittedImage?previewUrl:null;
   if(!message&&!submittedImage) return;
   mode=submittedMode;
-  if(currentView==='home') navigate('chat');
+  if(currentView==='home') navigate(destination);
   closeImageMenu();
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
   $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':'正在生成回复';

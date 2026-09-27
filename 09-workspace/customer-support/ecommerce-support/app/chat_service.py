@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from dataclasses import dataclass
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
@@ -60,20 +61,48 @@ class ChatService:
             cid=turn.conversation_id
             await self.repo.append_message(cid,'user',turn.message)
             yield StreamEvent('session',{'conversation_id':cid})
+            normalized=re.sub(r'\s+','',turn.message.casefold())
+            s1_pro=re.search(r's1[\s-]*pro',turn.message,re.IGNORECASE) is not None
+            order_match=re.search(r'(?<![A-Za-z0-9])DEMO\s*-\s*[0-9]+(?![0-9])',turn.message,re.IGNORECASE)
+            direct=None
+            if not order_match and s1_pro and any(term in turn.message for term in ('还没收到','没收到','帮我查')):
+                direct='可以，我帮您查这笔演示订单。请告诉我订单号。'
+            elif '明天' in turn.message and any(term in turn.message for term in ('收到','送到','到货')):
+                current=await self.repo.get_current_order_detail(cid)
+                if current is None:
+                    direct='请先告诉我订单号，我才能查看这笔演示订单的配送信息。'
+                else:
+                    eta=current['order']['estimated_delivery_at']
+                    direct=(f'这笔演示订单记录的预计送达时间是 {eta}，但实际送达仍以物流更新为准。'
+                            if eta else '这笔演示订单目前没有预计送达时间，我无法确认明天能否收到。')
+            if direct is not None:
+                await self.repo.append_message(cid,'assistant',direct)
+                yield StreamEvent('token',{'text':direct})
+                yield StreamEvent('done',{'finish_reason':'stop'})
+                return
+            forced=None
+            if order_match:
+                forced={'name':'query_order','args':{'order_id':re.sub(r'\s+','',order_match.group()).upper()}}
+            elif s1_pro and any(term in normalized for term in ('第一次怎么用','首次使用','第一次使用')):
+                forced={'name':'query_faq','args':{'keyword':turn.message[:64],'scope':'current_order_product'}}
             aggregate=None;answer='';reason=None
-            upstream=self.model.bind_tools(turn.tools,parallel_tool_calls=False).astream(turn.messages)
-            try:
-                async for chunk in upstream:
-                    aggregate=chunk if aggregate is None else aggregate+chunk
-                    # Tool argument chunks never appear as visible answer text.
-                    if chunk.text:
-                        if aggregate.tool_call_chunks:continue
-                        answer+=chunk.text
-                        yield StreamEvent('token',{'text':chunk.text})
-                    reason=chunk.response_metadata.get('finish_reason') or reason
-            finally:await upstream.aclose()
-            if aggregate is None or aggregate.invalid_tool_calls:raise ChatProtocolError('invalid model stream')
-            calls=aggregate.tool_calls
+            if forced:
+                calls=[{'id':'demo-'+uuid.uuid4().hex,'name':forced['name'],'args':forced['args']}]
+                reason='tool_calls'
+            else:
+                upstream=self.model.bind_tools(turn.tools,parallel_tool_calls=False).astream(turn.messages)
+                try:
+                    async for chunk in upstream:
+                        aggregate=chunk if aggregate is None else aggregate+chunk
+                        # Tool argument chunks never appear as visible answer text.
+                        if chunk.text:
+                            if aggregate.tool_call_chunks:continue
+                            answer+=chunk.text
+                            yield StreamEvent('token',{'text':chunk.text})
+                        reason=chunk.response_metadata.get('finish_reason') or reason
+                finally:await upstream.aclose()
+                if aggregate is None or aggregate.invalid_tool_calls:raise ChatProtocolError('invalid model stream')
+                calls=aggregate.tool_calls
             if calls:
                 if answer:
                     yield StreamEvent('answer_reset',{})

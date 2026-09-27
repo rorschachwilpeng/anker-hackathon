@@ -86,6 +86,12 @@ class Repository:
         async with self.sessions() as session:
             return await self._load_order(session,order_no)
 
+    async def get_current_order_detail(self, conversation_id):
+        async with self.sessions() as session:
+            order_no=(await session.execute(select(conversation_order_context.c.order_no).where(
+                conversation_order_context.c.conversation_id==conversation_id))).scalar_one_or_none()
+            return await self._load_order(session,order_no) if order_no else None
+
     async def get_current_order_product_model(self, conversation_id):
         async with self.sessions() as session:
             order_no=(await session.execute(select(conversation_order_context.c.order_no).where(
