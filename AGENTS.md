@@ -6,13 +6,13 @@
 
 - 本地项目目录：`/Users/pengyoutian/Desktop/彭祐天的Github/Wiki_of_Tian/projects/anker-hackathon`。
 - GitHub 仓库：`rorschachwilpeng/anker-hackathon`。
-- 日常工作分支：`codex/product-agent-development`；`main` 只接收经过用户确认的阶段成果。
-- 总控、Product Lead、Technical Builder 和售后调研 Agent 的正式交付都写入上述同一目录、同一工作分支。Codex 任务若仍显示旧工作树路径，应明确指定上述目录工作，不得把旧工作树中的修改当作已交付。
-- 不为日常协作另开长期分支或复制第二套项目目录。同一文件需要多人改动时，先在分工表中确认主责和先后顺序。
+- 正式开发分支：`codex/product-agent-development`；演示分支：`codex/hackathon-demo`，专门承载初赛限定场景和临时规则；`main` 只接收经过用户确认的阶段成果。
+- 总控、Product Lead、Technical Builder 和售后调研 Agent 的正式交付都写入上述同一目录、任务指定分支。Codex 任务若仍显示旧工作树路径，应明确指定上述目录工作，不得把旧工作树中的修改当作已交付。
+- 除用户已确认的正式开发与 Demo 两条分支外，不另开长期分支或复制第二套项目目录。切换分支前协调同目录中的其他 Agent，并保留未提交修改；演示规则不得整批合回正式开发分支。同一文件需要多人改动时，先确认主责和先后顺序。
 
 ## 工作原则
 
-- 产品方案、代码和调研报告都属于同一项目；正式成果提交到日常工作分支后，其他 Agent 才能以此为依据继续工作。
+- 产品方案、代码和调研报告都属于同一项目；正式成果提交到任务指定分支后，其他 Agent 才能以此为依据继续工作。交接必须写明分支和提交哈希。
 - 产品目标和验收标准由 Product Lead 确定；技术实现和验证由 Technical Builder 负责；售后调研 Agent 提供有来源的证据，不直接决定产品或技术方案。
 - 不把模拟能力写成真实能力。高风险操作先取得用户确认，无法解决时保留可供人工接手的上下文。
 - 提交或同步 `main` 前核对三类成果：最新代码、最新产品方案、最新调研报告；不能只凭某个工作树或聊天摘要判断已同步。

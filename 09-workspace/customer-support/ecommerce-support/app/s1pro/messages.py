@@ -23,8 +23,6 @@ CLARIFY_PRODUCT_T2080S = (
     '好，这个问题我来帮您查。先对一下：您用的是 eufy Robot Vacuum Omni S1 Pro 扫地机器人，对吗？',
     '收到，这事交给我。先确认一下：您这台是 eufy Robot Vacuum Omni S1 Pro 扫地机器人，对吗？',
 )
-CLARIFY_PRODUCT_AMBIGUOUS = '先确认一下：您说的 S1 Pro 是扫地机器人，还是吸乳器？也可以发一张产品或铭牌照片帮我确认。确认前我先不给您套用型号专属的排障步骤。'
-CLARIFY_PRODUCT_NOT_VACUUM = '明白，您说的是吸乳器，不是这台扫地机器人。我手头这条排障流程只有 T2080 扫地机器人的资料，不能把它的步骤用在吸乳器上。'
 CLARIFY_PRODUCT_IMAGE_UNKNOWN = '这张照片没能让我确认型号，我不敢乱猜。您补一张标签清楚点的照片，或者直接告诉我产品全名，都行。'
 CLARIFY_PRODUCT_GENERIC = '方便告诉我具体是哪款产品吗？不同型号查法不一样，我想给您查准了，怕指错路。'
 CLARIFY_PRODUCT_IMAGE_TEXT_CONFLICT = '照片里的线索和您说的对不上，我先不急着下结论。麻烦您用文字把产品全名告诉我，查准了再动手。'
@@ -74,15 +72,11 @@ CONFIRM_TICKET_ASKS = (
     '需要我把工单建好、交人工跟进吗？点下面的「可以建单」就行，您定。',
 )
 CONFIRM_TICKET_HUMAN_REQUESTS = (
-    '辛苦您试了还是没解决，我先把已知情况整理给您核对。',
-    '试过仍然没好，确实让人着急。我把这次的记录整理好了，请您先核对。',
+    '好，我帮您转人工。这里的“转人工”是建一张工单，把您的记录交给人工接着跟——'
+    '演示环境，不会真的提交给安克客服。您点下面的「可以建单」就行。',
+    '行，这就帮您转人工。演示环境里“转人工”是建一张工单，把您的记录交接给人工——'
+    '不会真的提交给安克客服。点下面的「可以建单」就可以。',
 )
-def confirm_ticket_human_request(summary, seed):
-    return confirm_ticket_with_summary(pick(CONFIRM_TICKET_HUMAN_REQUESTS,seed),summary)
-
-def confirm_ticket_with_summary(intro, summary):
-    return (f'{intro}\n交接摘要：{summary}\n'
-            '若准确，请回复「可以建单」。确认后只会创建本地演示工单，不会真的提交给安克客服或表示人工已经接手。')
 CONFIRM_TICKET_FRUSTRATION = (
     '连着试了两步还是没好，换谁都觉得泄气。我不想让您再白折腾——让人工接手吧，'
     '您试过的每一步我都记着，他们接着查就行。点下面的「可以建单」，或者说一声都可以。'
@@ -93,11 +87,10 @@ def ticket_created(number):
             '说明一下：这是演示环境里的工单，不会真的提交给安克客服。')
 
 def ticket_terminal(number):
-    return (f'本地演示工单 {number} 已创建，当前待处理；不会真的提交给安克客服，'
-            '也不代表人工已接手。')
+    return (f'您的工单 {number} 已经在排队了（演示环境，不会真的提交给安克客服），'
+            '人工会顺着记录接着处理，您不用再重复一遍。')
 
 TICKET_FAILED = '工单刚才没建成，可能是哪里抖了一下。您的进展我都记着呢，咱们再试一次？'
-TICKET_DEFERRED = '好，先不建单。您的处理记录还在，需要人工协助时再告诉我。'
 
 # --- 降级与边界 ---
 DEGRADED_UNDERSTANDING = '抱歉，这句我没太听明白——您是在说产品型号，还是告诉我试过之后的效果？'

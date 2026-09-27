@@ -15,12 +15,6 @@ const types = {refund:'退款',return_refund:'退货退款',exchange:'换货',re
 function scrollDown() { $('scroll-area').scrollTop = $('scroll-area').scrollHeight; }
 function canUpload() { return currentView==='product' && (mode===null || mode==='s1pro'); }
 function canContinue() { return currentView!=='ticket' && (!selectedImage || currentView==='product') && (mode!=='s1pro' || currentView==='product'); }
-function homeDestination(message) {
-  const normalized=message.toLowerCase().replace(/\s+/g,'');
-  if (/s1[\s-]*pro/i.test(message) && /吸力|不吸/.test(message)) return 'product';
-  if (/订单|物流|还没收到|没收到|配送/.test(normalized)) return 'order';
-  return 'chat';
-}
 function syncInput() {
   const hasImage = canUpload() && Boolean(selectedImage);
   $('send').disabled = Boolean(active) || !canContinue() || (!$('message').value.trim() && !hasImage);
@@ -219,7 +213,7 @@ async function loadTicket() {
     if(request===ticketRequest) {detail.replaceChildren();detail.hidden=true;$('ticket-status').textContent='工单读取失败，旧状态已隐藏。请点击“刷新进度”重试。';}
   }
 }
-const s1proStages={clarify_product:'确认产品中',ask_symptom:'了解故障现象',ask_feedback:'等待您的反馈',confirm_ticket:'等待建单确认',ticket_created:'工单已创建',ticket_failed:'建单未成功',ticket_deferred:'暂不建单',resolved:'问题已解决',no_answer:'暂无对应官方资料',degraded:'服务暂时降级'};
+const s1proStages={clarify_product:'确认产品中',ask_symptom:'了解故障现象',ask_feedback:'等待您的反馈',confirm_ticket:'等待建单确认',ticket_created:'工单已创建',ticket_failed:'建单未成功',resolved:'问题已解决',no_answer:'暂无对应官方资料',degraded:'服务暂时降级'};
 function updateS1ProStatus(progress,stage) {
   const bar=$('s1pro-status');
   if (currentView!=='product'||!progress) { bar.hidden=true; return; }
@@ -263,25 +257,20 @@ async function streamS1Pro(response,view) {
   if(!result) throw new Error('回复没有完整到达，请重试。');
   showS1Pro(result,view);
 }
-const productQuickReplies={candidate:['确认是 T2080 扫地机器人','不是这款产品'],category:['是扫地机器人','是吸乳器']};
-const s1proQuickReplies={symptom:['吸力变弱'],feedback:['好了，吸力恢复了','还是不行'],ticket_confirmation:['可以建单','再想想，先不建']};
-function disableQuickReplies() {
-  for(const button of document.querySelectorAll('.quick-reply')) button.disabled=true;
-}
-function renderS1ProQuickReplies(view,awaiting,productOptions) {
-  const options=awaiting==='product'?productQuickReplies[productOptions]:s1proQuickReplies[awaiting];
+const s1proQuickReplies={product:['是的，就是这款','不是这款产品'],symptom:['吸力变弱'],feedback:['好了，吸力恢复了','还是不行'],ticket_confirmation:['可以建单','再想想，先不建']};
+function renderS1ProQuickReplies(view,awaiting) {
+  const options=s1proQuickReplies[awaiting];
   if(!options) return;
   const row=document.createElement('div'); row.className='quick-replies';
   for(const text of options) {
     const button=document.createElement('button'); button.type='button'; button.className='quick-reply'; button.textContent=text;
-    button.onclick=()=>{ if(active||button.disabled) return; $('message').value=text; syncInput(); $('composer').requestSubmit(); };
+    button.onclick=()=>{ if(active) return; $('message').value=text; syncInput(); $('composer').requestSubmit(); };
     row.append(button);
   }
   view.article.append(row); scrollDown();
 }
 function showS1Pro(data,view) {
   if (!Number.isSafeInteger(data.conversation_id) || typeof data.reply !== 'string') throw new Error('服务回复格式异常。');
-  disableQuickReplies();
   conversationId=data.conversation_id; view.bubble.classList.remove('pending'); view.bubble.textContent=data.reply;
   if (typeof data.notice==='string' && data.notice) note(view,data.notice);
   if (data.source?.url && data.source?.title) {
@@ -296,7 +285,7 @@ function showS1Pro(data,view) {
   const stage=s1proStages[data.action]||'处理中';
   note(view,`当前阶段：${stage}`);
   updateS1ProStatus(data.progress,stage);
-  renderS1ProQuickReplies(view,data.progress?.awaiting,data.progress?.product_options);
+  renderS1ProQuickReplies(view,data.progress?.awaiting);
 }
 function closeImageMenu() {
   $('add-menu').hidden=true;
@@ -330,14 +319,12 @@ function chooseImage(image) {
 async function submit(event) {
   event.preventDefault(); if(active||!canContinue()) return;
   const message=$('message').value.trim();
-  const destination=mode?null:currentView==='home'?homeDestination(message):currentView;
-  const submittedMode=mode||(destination==='product'?'s1pro':'chat');
+  const submittedMode=mode||(currentView==='product'?'s1pro':'chat');
   const submittedImage=canUpload()?selectedImage:null;
   const submittedPreviewUrl=submittedImage?previewUrl:null;
   if(!message&&!submittedImage) return;
-  disableQuickReplies();
   mode=submittedMode;
-  if(currentView==='home') navigate(destination);
+  if(currentView==='home') navigate('chat');
   closeImageMenu();
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
   $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':'正在生成回复';
@@ -370,8 +357,7 @@ async function submit(event) {
     if(['正在思考…','正在识别图片并整理可见线索…','正在理解您的描述…','正在检索 eufy 官方排障资料…'].includes(view.bubble.textContent)) view.bubble.textContent='';
     const text=controller.signal.aborted?(timedOut?'等待超时，请重试。':'已停止生成，本轮未加入对话记忆。'):(error instanceof TypeError?'无法连接服务，请确认本地服务正在运行。':error.message);
     for(const badge of view.badges.values()) if(['running','retrying'].includes(badge.dataset.status)) {badge.dataset.status='failed';badge.textContent+=' · 状态未确认';}
-    const ticketAttempt=submittedMode==='s1pro' && /可以建单|同意建单|确认创建工单|请创建工单/.test(message);
-    note(view,text+(ticketAttempt?' 建单结果尚未确认，请先核对工单再重试。':''),!controller.signal.aborted||timedOut);
+    note(view,text+' 已提交的工单不会因停止生成而撤销。',!controller.signal.aborted||timedOut);
     const retry=document.createElement('button');retry.type='button';retry.className='retry';retry.textContent='重新编辑';retry.onclick=()=>{
       if(active) return;
       if(mode!==submittedMode||!canContinue()) { note(view,'请返回本轮服务模块后再重新编辑。'); return; }
