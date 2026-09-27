@@ -35,7 +35,7 @@
           </div><p class="home-caption">也可以直接在下方输入问题，从当前服务会话开始。</p>
         </section>
         <section id="order-welcome" hidden><span class="module-symbol">◎</span><h1>订单与物流</h1><p>查询演示订单信息与配送进度，后续问题可在同一会话继续。</p><div class="examples"><button type="button" data-prompt="我买的 S1 Pro 还没收到，帮我查一下。">我买的 S1 Pro 还没收到，帮我查一下。</button></div><p class="scope">演示订单需由你提供订单号；不会预先绑定订单或猜测送达日期。</p></section>
-        <section id="product-welcome" hidden><span class="module-symbol">✳</span><h1>产品咨询与排障</h1><p>先确认产品，再依据可核查资料逐步处理；图片只作为可见线索。</p><div class="examples"><button type="button" data-prompt="我的 S1 Pro 最近吸力变弱了，怎么办？">我的 S1 Pro 最近吸力变弱了，怎么办？</button><button type="button" data-prompt="我的 S1 Pro 扫地机器人吸力变弱了。">我的 S1 Pro 扫地机器人吸力变弱了。</button></div><p class="scope">进入模块不代表已确认型号；转人工建单前会请求你的同意。</p></section>
+        <section id="product-welcome" hidden><span class="module-symbol">✳</span><h1>产品咨询与排障</h1><p>先确定产品，再依据可核查资料逐步处理；图片识别范围见「关于演示」。</p><div class="examples"><button type="button" data-prompt="我的 S1 Pro 最近吸力变弱了，怎么办？">我的 S1 Pro 最近吸力变弱了，怎么办？</button><button type="button" data-prompt="我的 S1 Pro 扫地机器人吸力变弱了。">我的 S1 Pro 扫地机器人吸力变弱了。</button></div><p class="scope">进入模块不代表已确认型号；转人工建单前会请求你的同意。</p></section>
       </div>
       <div class="messages" id="messages" role="log" aria-label="聊天消息" aria-live="polite" aria-relevant="additions" hidden></div>
       <section class="ticket-panel" id="ticket-panel" aria-labelledby="ticket-heading" hidden>
@@ -54,6 +54,6 @@
     </form><div class="footnote">AI 回复仅供参考；订单、工单均为本地演示数据，不代表安克真实服务。</div><div class="sr-only" id="announcement" role="status"></div></div>
   </main>
 </div>
-<div class="about-mask" id="about-mask" hidden><section class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-title"><button class="about-close" id="about-close" type="button" aria-label="关闭说明">×</button><h2 id="about-title">关于演示</h2><p>知遇把咨询、订单查询和产品排障放在同一个服务入口。回答来自实际运行的本地客服服务，不是预录回放。</p><p>固定订单和工单写入本地演示库；产品知识展示可核查的来源。没有连接安克真实订单、物流或人工客服系统。跨对话链路的任务状态迁移、人工回复与处理结果反馈仍未实现。</p><details><summary>内部工具：售后信息提取</summary><form id="extract-form" class="extract-form"><label for="extract-input">售后描述</label><textarea id="extract-input" maxlength="16000" placeholder="粘贴售后描述，仅整理已提供的信息"></textarea><button type="submit">提取信息</button></form><div id="extract-result" role="status"></div></details></section></div>
+<div class="about-mask" id="about-mask" hidden><section class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-title"><button class="about-close" id="about-close" type="button" aria-label="关闭说明">×</button><h2 id="about-title">关于演示</h2><p>知遇把咨询、订单查询和产品排障放在同一个服务入口。回答来自实际运行的本地客服服务，不是预录回放。</p><p>固定订单和工单写入本地演示库；产品知识展示可核查的来源。初赛版图片识别使用预设 T2080 结果（有效 JPEG/PNG 会进入该演示路径），不代表真实视觉识别能力。没有连接安克真实订单、物流或人工客服系统。跨对话链路的任务状态迁移、人工回复与处理结果反馈仍未实现。</p><details><summary>内部工具：售后信息提取</summary><form id="extract-form" class="extract-form"><label for="extract-input">售后描述</label><textarea id="extract-input" maxlength="16000" placeholder="粘贴售后描述，仅整理已提供的信息"></textarea><button type="submit">提取信息</button></form><div id="extract-result" role="status"></div></details></section></div>
 </body>
 </html>

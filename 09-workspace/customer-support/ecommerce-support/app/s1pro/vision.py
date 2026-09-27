@@ -15,6 +15,7 @@ class VisualObservation(BaseModel):
     visible_text: list[str]
     visible_clues: list[str]
     uncertainties: list[str]
+    simulated: bool = False
 
 
 class VisionError(Exception):

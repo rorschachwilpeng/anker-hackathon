@@ -14,7 +14,8 @@ def _explicit_product(message):
     lowered=message.casefold()
     if any(term in lowered for term in ('吸乳器','吸奶器','breast pump')):
         return False
-    return (('t2080' in lowered and '扫地机器人' in message)
+    return (re.fullmatch(r'\s*(?:型号(?:是|为|[:：])?\s*)?t2080[。.!！]?\s*',message,re.IGNORECASE) is not None
+            or ('t2080' in lowered and '扫地机器人' in message)
             or (_mentions_s1_pro(message) and 'eufy' in lowered
                 and ('扫地机器人' in message or 'robot vacuum' in lowered)))
 
@@ -28,7 +29,8 @@ def _affirm_product(message):
 
 
 def _decline_product(message):
-    return message.strip('。！!，, ')=='不是这款产品'
+    cleaned=message.strip('。！!，, ')
+    return cleaned=='不是这款产品' or re.search(r'不是\s*t2080|not\s+t2080',cleaned,re.IGNORECASE) is not None
 
 
 def _confirms_t2080_vacuum(message):
@@ -36,12 +38,6 @@ def _confirms_t2080_vacuum(message):
     return ('t2080' in lowered and '扫地机器人' in message
             and not any(term in message for term in ('吸乳器','吸奶器'))
             and any(word in message for word in ('对','就是','确认')))
-
-
-def _confirms_visible_vacuum(message,observation):
-    return (observation is not None and observation.candidate_model=='T2080'
-            and '扫地机器人' in message and any(word in message for word in ('是','就是','对'))
-            and '吸乳器' not in message and '吸奶器' not in message)
 
 
 def _visual_conflicts_with_t2080(observation):
@@ -53,6 +49,13 @@ def _visual_conflicts_with_t2080(observation):
     model_codes=re.findall(r'\bmodel(?:\s*(?:number|no\.?))?\s*[:#]?\s*([a-z0-9-]+)',visible_content)
     target_models={'t2080','s1','s1-pro','s1pro'}
     return any(code.casefold() not in target_models for code in model_codes)
+
+
+def _text_conflicts_with_t2080(message):
+    codes=re.findall(r'(?<![a-zA-Z0-9])t\d{4}(?![a-zA-Z0-9])',message,re.IGNORECASE)
+    return (any(code.upper()!='T2080' for code in codes)
+            or _decline_product(message)
+            or any(term in message for term in ('其他型号','别的型号')))
 
 
 class S1ProFlow:
@@ -89,11 +92,15 @@ class S1ProFlow:
                 'visible_text':list(observation.visible_text),
                 'visible_clues':list(observation.visible_clues),
                 'uncertainties':list(observation.uncertainties),
+                'simulated':observation.simulated,
             }
         tool_calls=0
         urgent_notice=''
+        visual_model_intro=''
 
         async def respond(action,reply,source=None,ticket_no=None,ticket_url=None,product_options=None):
+            if visual_model_intro:
+                reply=f'{visual_model_intro}{reply}'
             if urgent_notice:
                 reply=f'{urgent_notice}{reply}'
             await self.repo.save_s1pro_state(conversation_id,state)
@@ -187,6 +194,17 @@ class S1ProFlow:
                    else copy.IMAGE_SERVICE_UNAVAILABLE)
             return await respond('clarify_product' if state.confirmed_model is None else 'degraded',reply)
 
+        if (state.awaiting=='product' and _decline_product(message)) or (state.confirmed_model and (_decline_product(message) or _text_conflicts_with_t2080(message))):
+            state.confirmed_model=None
+            state.pending_model_candidate=None
+            state.visual_observation=None
+            state.suggested_steps.clear()
+            state.completed_steps.clear()
+            state.sources.clear()
+            state.feedback=None
+            state.awaiting='product'
+            return await respond('clarify_product',copy.CLARIFY_PRODUCT_GENERIC)
+
         if state.awaiting=='ticket_confirmation':
             if message.strip('。！!，, ')=='再想想，先不建':
                 state.awaiting=None
@@ -194,12 +212,6 @@ class S1ProFlow:
             if not _explicit_consent(message):
                 return await respond('confirm_ticket',copy.pick(copy.CONFIRM_TICKET_ASKS,conversation_id))
             return await create_ticket()
-
-        if state.awaiting=='product' and _decline_product(message):
-            state.confirmed_model=None
-            state.pending_model_candidate=None
-            state.visual_observation=None
-            return await respond('clarify_product',copy.CLARIFY_PRODUCT_GENERIC)
 
         if state.awaiting=='product' and state.pending_model_candidate is None and state.visual_observation is None:
             if message.strip('。！!，, ')=='是扫地机器人':
@@ -211,9 +223,8 @@ class S1ProFlow:
 
         affirmative_confirmation=(
             state.awaiting=='product'
-            and ((state.pending_model_candidate=='T2080'
-                  and (_affirm_product(message) or _confirms_t2080_vacuum(message)))
-                 or _confirms_visible_vacuum(message,observation))
+            and state.pending_model_candidate=='T2080'
+            and (_affirm_product(message) or _confirms_t2080_vacuum(message))
         )
         if affirmative_confirmation:
             understood={}
@@ -236,17 +247,6 @@ class S1ProFlow:
         if state.symptom is None:
             state.symptom=understood.get('symptom_candidate') or ('吸力变弱' if any(term in message for term in ('吸力变弱','不吸')) else None)
 
-        if not message.strip() and (observation is not None or image_failed) and state.symptom is None:
-            state.pending_model_candidate=(
-                'T2080' if observation is not None and observation.candidate_model=='T2080' else None
-            )
-            state.awaiting='symptom'
-            if observation is not None and observation.candidate_model=='T2080':
-                seen='、'.join((observation.visible_text+observation.visible_clues)[:3])
-                if seen:
-                    return await respond('ask_symptom',copy.ask_symptom_with_clues(seen))
-            return await respond('ask_symptom',copy.pick(copy.ASK_SYMPTOM_IMAGE_ONLYS,conversation_id))
-
         explicit_product=_explicit_product(message)
         text_candidate=understood.get('product_candidate')
         visual_conflict=_visual_conflicts_with_t2080(observation) if observation is not None else False
@@ -254,7 +254,8 @@ class S1ProFlow:
             observation is not None
             and (
                 (visual_conflict and explicit_product)
-                or (observation.candidate_model=='T2080' and text_candidate not in (None,'T2080'))
+                or (observation.candidate_model=='T2080'
+                    and (text_candidate not in (None,'T2080') or _text_conflicts_with_t2080(message)))
             )
         )
         if image_conflict:
@@ -269,11 +270,6 @@ class S1ProFlow:
             state.awaiting='product'
             return await respond('clarify_product',copy.CLARIFY_PRODUCT_IMAGE_NOT_TARGET)
 
-        if observation is not None and observation.candidate_model=='unknown' and state.confirmed_model is None:
-            state.pending_model_candidate=None
-            state.awaiting='product'
-            return await respond('clarify_product',copy.CLARIFY_PRODUCT_IMAGE_UNKNOWN)
-
         if ('吸乳器' in message or '吸奶器' in message or 'breast pump' in message.casefold()) and not explicit_product:
             state.confirmed_model=None
             state.pending_model_candidate=None
@@ -286,7 +282,17 @@ class S1ProFlow:
             state.awaiting='product'
             return await respond('clarify_product',copy.CLARIFY_PRODUCT_AMBIGUOUS,product_options='category')
 
-        if observation is not None and observation.candidate_model=='T2080' and state.confirmed_model is None:
+        if observation is not None and observation.candidate_model=='unknown' and state.confirmed_model is None:
+            state.pending_model_candidate=None
+            state.awaiting='product'
+            return await respond('clarify_product',copy.CLARIFY_PRODUCT_IMAGE_UNKNOWN)
+
+        if observation is not None and observation.simulated and state.confirmed_model is None:
+            state.confirmed_model='T2080'
+            state.pending_model_candidate=None
+            state.awaiting=None
+            visual_model_intro=copy.PHOTO_T2080_CONFIRMED
+        elif observation is not None and observation.candidate_model=='T2080' and state.confirmed_model is None:
             state.pending_model_candidate='T2080'
         elif observation is not None and state.confirmed_model is None:
             state.pending_model_candidate=None
@@ -295,7 +301,8 @@ class S1ProFlow:
             if not (explicit_product or affirmative_confirmation):
                 if state.pending_model_candidate is None:
                     previous_candidate=(state.visual_observation or {}).get('candidate_model')
-                    if state.visual_observation is None or previous_candidate=='T2080':
+                    previous_simulated=(state.visual_observation or {}).get('simulated',False)
+                    if state.visual_observation is None or (previous_candidate=='T2080' and not previous_simulated):
                         state.pending_model_candidate='T2080'
                 state.awaiting='product'
                 if state.pending_model_candidate=='T2080':

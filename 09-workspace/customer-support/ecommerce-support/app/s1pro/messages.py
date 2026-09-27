@@ -32,14 +32,7 @@ CLARIFY_PRODUCT_IMAGE_TEXT_CONFLICT = '照片里的线索和您说的对不上�
 CLARIFY_PRODUCT_IMAGE_NOT_TARGET = '这张照片没能让我确认是这台扫地机器人，我不敢乱猜。您直接告诉我产品全名好吗？查准了再给您出主意。'
 
 # --- 了解症状 ---
-def ask_symptom_with_clues(seen):
-    return (f'照片里能看到「{seen}」，看着像是 eufy S1 Pro（T2080）扫地机器人。'
-            '是这款的话您说一声；再告诉我它现在哪里不对劲，我接着帮您查。')
-
-ASK_SYMPTOM_IMAGE_ONLYS = (
-    '告诉我产品型号和它现在的问题，我来帮您想办法。',
-    '您直接告诉我型号和故障现象就行，我来想办法。',
-)
+PHOTO_T2080_CONFIRMED = '图片识别结果是 eufy S1 Pro（T2080）扫地机器人。若型号不对，请回复「不是这款产品」或告诉我实际型号。'
 ASK_SYMPTOMS = (
     '它现在是怎么个不对劲法？您说说看，我来帮您分析。',
     '它现在是什么情况？您描述一下，我心里好有个数。',

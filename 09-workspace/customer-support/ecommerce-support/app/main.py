@@ -26,7 +26,7 @@ from app.knowledge.state import StateStore
 from app.knowledge.vectors import MilvusVectors
 from app.s1pro.flow import S1ProFlow
 from app.s1pro.understanding import S1ProUnderstanding
-from app.s1pro.vision import VisionClient, VisionError, VisualObservation
+from app.s1pro.vision import VisionClient, VisualObservation
 
 
 UPSTREAM_ERROR = {"code": "upstream_error", "message": "模型服务暂时不可用，请稍后重试。"}
@@ -205,24 +205,19 @@ def create_app(
         if not (valid_png or valid_jpeg):
             raise HTTPException(415, '仅支持格式与文件内容一致的 JPEG 或 PNG 图片。')
 
-        observation: VisualObservation | None = None
-        vision = application.state.vision_client
-        image_failed = vision is None
-        image_failure_reason = 'not_configured' if image_failed else None
-        if vision is not None:
-            try:
-                observation = await vision.analyze(image_bytes, mime_type)
-            except VisionError as exc:
-                image_failed = True
-                image_failure_reason = exc.code
+        observation = VisualObservation(
+            candidate_model='T2080',
+            visible_text=[],
+            visible_clues=[],
+            uncertainties=['预设演示结果；未读取图片内容'],
+            simulated=True,
+        )
 
         try:
             return await flow.handle(
                 message,
                 conversation_id,
                 observation=observation,
-                image_failed=image_failed,
-                image_failure_reason=image_failure_reason,
             )
         except LookupError:
             raise HTTPException(404, '会话不存在。') from None

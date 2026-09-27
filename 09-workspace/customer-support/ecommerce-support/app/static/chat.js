@@ -351,7 +351,7 @@ async function submit(event) {
   if(currentView==='home') navigate(destination);
   closeImageMenu();
   const controller=new AbortController(); active=controller; busy(true); $('message').value='';
-  $('announcement').textContent=submittedImage?'正在识别图片并整理可见线索…':'正在生成回复';
+  $('announcement').textContent=submittedImage?'正在处理图片并整理回复…':'正在生成回复';
   addMessage('user',message,submittedImage?{url:submittedPreviewUrl}:null);
   const view=addMessage('assistant','正在整理回复…');
   view.bubble.classList.add('pending');
